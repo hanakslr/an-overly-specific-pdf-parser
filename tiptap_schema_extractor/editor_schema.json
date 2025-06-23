@@ -91,6 +91,23 @@
       "marks": null,
       "attrs": {},
       "defining": false
+    },
+    "image": {
+      "group": "block",
+      "content": null,
+      "marks": null,
+      "attrs": {
+        "src": {
+          "default": null
+        },
+        "alt": {
+          "default": null
+        },
+        "title": {
+          "default": null
+        }
+      },
+      "defining": false
     }
   },
   "marks": {

@@ -7,10 +7,11 @@ global.DOMParser = window.DOMParser;
 
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
+import Image from '@tiptap/extension-image'
 import fs from "fs";
 
 const editor = new Editor({
-  extensions: [StarterKit],
+  extensions: [StarterKit, Image],
 });
 
 function pairsFromFlat(array) {
