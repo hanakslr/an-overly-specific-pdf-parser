@@ -1,0 +1,126 @@
+{
+  "nodes": {
+    "paragraph": {
+      "group": "block",
+      "content": "inline*",
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "blockquote": {
+      "group": "block",
+      "content": "block+",
+      "marks": null,
+      "attrs": {},
+      "defining": true
+    },
+    "bulletList": {
+      "group": "block list",
+      "content": "listItem+",
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "codeBlock": {
+      "group": "block",
+      "content": "text*",
+      "marks": "",
+      "attrs": {
+        "language": {
+          "default": null
+        }
+      },
+      "defining": true
+    },
+    "doc": {
+      "group": null,
+      "content": "block+",
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "hardBreak": {
+      "group": "inline",
+      "content": null,
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "heading": {
+      "group": "block",
+      "content": "inline*",
+      "marks": null,
+      "attrs": {
+        "level": {
+          "default": 1
+        }
+      },
+      "defining": true
+    },
+    "horizontalRule": {
+      "group": "block",
+      "content": null,
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "listItem": {
+      "group": null,
+      "content": "paragraph block*",
+      "marks": null,
+      "attrs": {},
+      "defining": true
+    },
+    "orderedList": {
+      "group": "block list",
+      "content": "listItem+",
+      "marks": null,
+      "attrs": {
+        "start": {
+          "default": 1
+        },
+        "type": {
+          "default": null
+        }
+      },
+      "defining": false
+    },
+    "text": {
+      "group": "inline",
+      "content": null,
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    }
+  },
+  "marks": {
+    "bold": {
+      "group": null,
+      "content": null,
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "code": {
+      "group": null,
+      "content": null,
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "italic": {
+      "group": null,
+      "content": null,
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "strike": {
+      "group": null,
+      "content": null,
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    }
+  }
+}

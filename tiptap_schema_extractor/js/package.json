@@ -1,0 +1,9 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@tiptap/core": "^2.22.3",
+    "@tiptap/pm": "^2.22.3",
+    "@tiptap/starter-kit": "^2.22.3",
+    "jsdom": "^26.1.0"
+  }
+}
