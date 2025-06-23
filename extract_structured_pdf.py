@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any
+from typing import Any, TypedDict
 import pymupdf  # PyMuPDF
 import json
 import os
@@ -29,6 +29,17 @@ class ImageItem(Item):
 class PageResult:
     page: int
     content: list[Item]
+
+class PyMuPDFOutput(TypedDict):
+    pages: list[PageResult]
+
+def extract(file_path: str) -> dict:
+    result = extract_structured_content(file_path)
+        
+    # Condense matching text elements
+    condense_matching_elements(result)
+
+    return result
 
 def extract_structured_content(pdf_path) -> list[PageResult]:
     doc = pymupdf.open(pdf_path)
