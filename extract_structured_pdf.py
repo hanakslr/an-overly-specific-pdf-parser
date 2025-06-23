@@ -89,7 +89,6 @@ def extract_structured_content(pdf_path) -> list[PageResult]:
                     'bbox': block.get('bbox'),
                     'image': image_details
                 }
-                print(f"Found image block: {block_details}")
                 bbox = block.get("bbox")
    
                 image_name = f"{image_dir}/page_{page_num}_image_{len(page_items)+1}.png"
@@ -105,7 +104,6 @@ def extract_structured_content(pdf_path) -> list[PageResult]:
                             bbox= bbox,
                             page= page_num
                         ))
-                        print(f"✅ Saved image: {image_name}")
                 except Exception as e:
                     print(f"⚠️ Could not extract image on page {page_num}: {e}")
 
@@ -149,7 +147,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python extract_pdf_structured.py town_plan.pdf")
     else:
-        output_json="output/pymupdf_output_condensed.json"
+        output_json="output/pymupdf/pymupdf_output_condensed.json"
         result = extract_structured_content(sys.argv[1])
         
         # Condense matching text elements

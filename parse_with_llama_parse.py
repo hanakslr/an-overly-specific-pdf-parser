@@ -20,10 +20,9 @@ class LlamaParseOutput(TypedDict):
     job_id: str # UUID
     file_path: str
 
-def parse(pdf_path: str, output_path: str = "output/llamaparse_output.json"):
+def parse(pdf_path: str):
     """
-    Given an input path, parse the file with llamaparse, dump the results to json,
-    and then return them.
+    Given an input path, parse the file with llamaparse and then return them.
     """
     # Initialize the parser
     parser = LlamaParse(api_key=os.getenv("LLAMA_PARSE_API_KEY"), verbose=True, premium_mode=True)
@@ -31,10 +30,6 @@ def parse(pdf_path: str, output_path: str = "output/llamaparse_output.json"):
     image_dir = f"images/llamaparse/{os.path.basename(pdf_path)}"
     
     save_images(parser, json_objs, image_dir)
-
-    # Save to JSON
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(json_objs, f, indent=2, ensure_ascii=False)
 
     metadata= json_objs[0]["job_metadata"]
 
@@ -75,7 +70,6 @@ def save_images(parser, json_objs, image_dir):
                     new_path = os.path.join(image_dir, clean_name)
                     try:
                         os.rename(img_file, new_path)
-                        print(f"  🔄 Renamed: {filename} → {clean_name}")
                     except Exception as e:
                         print(f"  ⚠️ Could not rename {filename}: {e}")
         
@@ -87,4 +81,8 @@ if __name__ == "__main__":
         print("Usage: python parse_with_llamaparse.py <path-to-pdf>")
     else:
         pdf_path = sys.argv[1]
-        parse(pdf_path)
+        result = parse(pdf_path)
+
+        # Save to JSON
+        with open("output/llamaparse/llamaparse_output.json", "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
