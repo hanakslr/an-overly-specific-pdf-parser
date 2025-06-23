@@ -39,4 +39,4 @@ if __name__ == "__main__":
         print("Usage: python parse_with_llamaparse.py <path-to-pdf>")
     else:
         pdf_path = sys.argv[1]
-        parse_with_llamaparse(pdf_path)
+        parse(pdf_path)

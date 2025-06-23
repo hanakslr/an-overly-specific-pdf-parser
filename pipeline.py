@@ -1,3 +1,7 @@
+import sys
+import json
+
+from dataclasses import asdict, is_dataclass
 from typing import TypedDict
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
@@ -32,11 +36,13 @@ def build_pipeline():
 
     return builder.compile()
 
-
+class DataclassJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if is_dataclass(obj):
+            return asdict(obj)
+        return super().default(obj)
+    
 if __name__ == "__main__":
-    import sys
-    import json
-
     pdf_path = sys.argv[1]
     graph = build_pipeline()
     memory = MemorySaver()
@@ -44,6 +50,5 @@ if __name__ == "__main__":
     final_state = graph.invoke({"pdf_path": pdf_path}, config={"memory": memory})
 
     with open("output.json", "w", encoding="utf-8") as f:
-        json.dump(final_state, f, indent=2, ensure_ascii=False)
-
+        json.dump(final_state, f, indent=2, ensure_ascii=False, cls=DataclassJSONEncoder)
     print("✅ Pipeline complete.")
