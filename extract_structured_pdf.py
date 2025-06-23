@@ -41,9 +41,15 @@ def extract(file_path: str) -> dict:
 
     return result
 
+
 def extract_structured_content(pdf_path) -> list[PageResult]:
     doc = pymupdf.open(pdf_path)
     result = []
+
+    # We will store images in images/pymupdf/{pdf_path}
+    # Ensure the image output directory exists
+    image_dir = f"images/pymupdf/{os.path.basename(pdf_path)}"
+    os.makedirs(image_dir, exist_ok=True)
 
     for page_num, page in enumerate(doc, start=1):
         page_items: list[Item] = []
@@ -65,24 +71,41 @@ def extract_structured_content(pdf_path) -> list[PageResult]:
                     
 
             elif block_type == 1:  # Image block
+                # Print relevant block details without raw image data
+                image_data = block.get('image')
+                if isinstance(image_data, dict):
+                    image_details = {
+                        'xref': image_data.get('xref'),
+                        'width': image_data.get('width'),
+                        'height': image_data.get('height'),
+                        'colorspace': image_data.get('colorspace'),
+                        'bpc': image_data.get('bpc'),  # bits per component
+                    }
+                else:
+                    image_details = f"<image data: {type(image_data).__name__}>"
+                
+                block_details = {
+                    'type': block.get('type'),
+                    'bbox': block.get('bbox'),
+                    'image': image_details
+                }
+                print(f"Found image block: {block_details}")
                 bbox = block.get("bbox")
-                image_name = f"page_{page_num}_image_{len(page_items)+1}.png"
-                # Save the image by xref
+   
+                image_name = f"{image_dir}/page_{page_num}_image_{len(page_items)+1}.png"
+                # Save the image from raw bytes
                 try:
-                    img_index = block.get("image", {}).get("xref")
-                    if img_index:
-                        pix = pymupdf.Pixmap(doc, img_index)
-                        if pix.n < 5:  # RGB
-                            pix.save(image_name)
-                        else:  # CMYK or grayscale
-                            pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
-                            pix.save(image_name)
+                    image_data = block.get("image")
+                    if isinstance(image_data, bytes):
+                        with open(image_name, "wb") as f:
+                            f.write(image_data)
                         page_items.append(ImageItem(
                             type= "image",
                             src=image_name,
                             bbox= bbox,
                             page= page_num
                         ))
+                        print(f"✅ Saved image: {image_name}")
                 except Exception as e:
                     print(f"⚠️ Could not extract image on page {page_num}: {e}")
 
