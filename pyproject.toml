@@ -11,3 +11,18 @@ dependencies = [
     "llama-parse>=0.6.35",
     "pymupdf>=1.26.1",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.0",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "I", "F"]
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+# Use spaces around operators
+line-ending = "auto"
+indent-style = "space"

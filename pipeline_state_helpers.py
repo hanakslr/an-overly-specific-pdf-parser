@@ -2,10 +2,10 @@
 Some helper functions for saving and resuming from previous state.
 """
 
-from dataclasses import asdict, is_dataclass
+import glob
 import json
 import os
-import glob
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
 
 
@@ -15,21 +15,22 @@ def get_latest_output(pdf_path: str):
     output_dir = f"output/pipeline/{pdf_name}"
     if not os.path.exists(output_dir):
         return None
-    
+
     # Find all output JSON files for this PDF
     output_files = glob.glob(f"{output_dir}/output_*.json")
     if not output_files:
         return None
-    
+
     # Sort by modification time and get the latest
     latest_file = max(output_files, key=os.path.getmtime)
-    
+
     try:
         with open(latest_file, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         print(f"⚠️ Could not load latest output: {e}")
         return None
+
 
 def resume_from_latest(pdf_path: str):
     """Resume pipeline from the latest output for this specific PDF."""
@@ -40,13 +41,15 @@ def resume_from_latest(pdf_path: str):
     else:
         print("🆕 Starting fresh pipeline")
         return {"pdf_path": pdf_path}
-    
+
+
 class DataclassJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if is_dataclass(obj):
             return asdict(obj)
         return super().default(obj)
-    
+
+
 def save_output(pdf_path, final_state):
     # Create PDF-specific output directory
     pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
@@ -58,6 +61,8 @@ def save_output(pdf_path, final_state):
     output_filename = f"{output_dir}/output_{timestamp}.json"
 
     with open(output_filename, "w", encoding="utf-8") as f:
-        json.dump(final_state, f, indent=2, ensure_ascii=False, cls=DataclassJSONEncoder)
+        json.dump(
+            final_state, f, indent=2, ensure_ascii=False, cls=DataclassJSONEncoder
+        )
 
     return output_filename
