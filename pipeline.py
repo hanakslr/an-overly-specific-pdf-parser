@@ -7,7 +7,7 @@ from langgraph.graph import StateGraph
 
 from extract_structured_pdf import PyMuPDFOutput, extract
 from parse_with_llama_parse import LlamaParseOutput, parse
-from pipeline_state_helpers import resume_from_latest, save_output
+from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
 
 
 class PipelineState(TypedDict):
@@ -72,6 +72,9 @@ if __name__ == "__main__":
         initial_state = {"pdf_path": pdf_path}
 
     graph = build_pipeline()
+
+    draw_pipeline(graph)
+
     memory = MemorySaver()
 
     final_state = graph.invoke(initial_state, config={"memory": memory})

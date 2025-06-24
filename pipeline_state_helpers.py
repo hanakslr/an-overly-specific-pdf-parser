@@ -8,6 +8,8 @@ import os
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 
+from langgraph.graph.state import CompiledStateGraph
+
 
 def get_latest_output(pdf_path: str):
     """Get the latest output JSON file from the pipeline output directory for this specific PDF."""
@@ -66,3 +68,16 @@ def save_output(pdf_path, final_state):
         )
 
     return output_filename
+
+
+def draw_pipeline(graph: CompiledStateGraph):
+    # Generate pipeline visualization
+    try:
+        # Generate Mermaid PNG and save it
+        png_bytes = graph.get_graph().draw_mermaid_png()
+        png_path = "pipeline_diagram.png"
+        with open(png_path, "wb") as f:
+            f.write(png_bytes)
+        print(f"📊 Pipeline diagram saved to: {png_path}")
+    except Exception as e:
+        print(f"⚠️ Could not generate pipeline diagram: {e}")
