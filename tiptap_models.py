@@ -3,6 +3,13 @@ from typing import Any, List, Literal, Optional, Union
 
 from pydantic import BaseModel
 
+
+# Common parent class for all Tiptap nodes
+class TiptapNode(BaseModel):
+    # Base class for all Tiptap/ProseMirror nodes
+    pass
+
+
 # Node group unions for convenience
 
 InlineNode = Union["HardbreakNode", "TextNode"]
@@ -19,37 +26,37 @@ BlockNode = Union[
 ListNode = Union["BulletlistNode", "OrderedlistNode"]
 
 
-class ParagraphNode(BaseModel):
+class ParagraphNode(TiptapNode):
     type: Literal["paragraph"] = "paragraph"
-    content: Optional[List["InlineNode"]] = None
+    content: Optional[List["InlineNode"]]
 
 
-class BlockquoteNode(BaseModel):
+class BlockquoteNode(TiptapNode):
     type: Literal["blockquote"] = "blockquote"
-    content: Optional[List["BlockNode"]] = None
+    content: List["BlockNode"]
 
 
-class BulletlistNode(BaseModel):
+class BulletlistNode(TiptapNode):
     type: Literal["bulletList"] = "bulletList"
-    content: Optional[List["ListitemNode"]] = None
+    content: List["ListitemNode"]
 
 
 class CodeblockNodeAttrs(BaseModel):
     language: Optional[Any] = None
 
 
-class CodeblockNode(BaseModel):
+class CodeblockNode(TiptapNode):
     type: Literal["codeBlock"] = "codeBlock"
     attrs: CodeblockNodeAttrs = CodeblockNodeAttrs()
-    content: Optional[List["TextNode"]] = None
+    content: Optional[List["TextNode"]]
 
 
-class DocNode(BaseModel):
+class DocNode(TiptapNode):
     type: Literal["doc"] = "doc"
-    content: Optional[List["BlockNode"]] = None
+    content: List["BlockNode"]
 
 
-class HardbreakNode(BaseModel):
+class HardbreakNode(TiptapNode):
     type: Literal["hardBreak"] = "hardBreak"
 
 
@@ -57,19 +64,19 @@ class HeadingNodeAttrs(BaseModel):
     level: int = 1
 
 
-class HeadingNode(BaseModel):
+class HeadingNode(TiptapNode):
     type: Literal["heading"] = "heading"
     attrs: HeadingNodeAttrs = HeadingNodeAttrs()
-    content: Optional[List["InlineNode"]] = None
+    content: Optional[List["InlineNode"]]
 
 
-class HorizontalruleNode(BaseModel):
+class HorizontalruleNode(TiptapNode):
     type: Literal["horizontalRule"] = "horizontalRule"
 
 
-class ListitemNode(BaseModel):
+class ListitemNode(TiptapNode):
     type: Literal["listItem"] = "listItem"
-    content: Optional[Union["ParagraphNode", List["BlockNode"]]] = None
+    content: Union["ParagraphNode", Optional[List["BlockNode"]]]
 
 
 class OrderedlistNodeAttrs(BaseModel):
@@ -77,13 +84,13 @@ class OrderedlistNodeAttrs(BaseModel):
     type: Optional[Any] = None
 
 
-class OrderedlistNode(BaseModel):
+class OrderedlistNode(TiptapNode):
     type: Literal["orderedList"] = "orderedList"
     attrs: OrderedlistNodeAttrs = OrderedlistNodeAttrs()
-    content: Optional[List["ListitemNode"]] = None
+    content: List["ListitemNode"]
 
 
-class TextNode(BaseModel):
+class TextNode(TiptapNode):
     type: Literal["text"] = "text"
     text: str
 
@@ -94,6 +101,6 @@ class ImageNodeAttrs(BaseModel):
     title: Optional[Any] = None
 
 
-class ImageNode(BaseModel):
+class ImageNode(TiptapNode):
     type: Literal["image"] = "image"
     attrs: ImageNodeAttrs = ImageNodeAttrs()
