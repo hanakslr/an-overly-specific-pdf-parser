@@ -1,41 +1,38 @@
 import json
 import os
-from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, TypedDict
+from typing import Any, List, Union
 
 import pymupdf  # PyMuPDF
+from pydantic import BaseModel
 
 
-class Item:
+class Item(BaseModel):
     type: str
     page: int
 
 
-@dataclass
 class TextItem(Item):
-    type: str
+    type: str = "text"
     page: int
     text: str
     font: str
     size: float
 
 
-@dataclass
 class ImageItem(Item):
-    type: str
+    type: str = "image"
     page: int
     src: str
     bbox: Any
 
 
-@dataclass
-class PageResult:
+class PageResult(BaseModel):
     page: int
-    content: list[Item]
+    content: List[Union[TextItem, ImageItem]]
 
 
-class PyMuPDFOutput(TypedDict):
-    pages: list[PageResult]
+class PyMuPDFOutput(BaseModel):
+    pages: List[PageResult]
 
 
 def extract(file_path: str) -> dict:
@@ -47,7 +44,7 @@ def extract(file_path: str) -> dict:
     return result
 
 
-def extract_structured_content(pdf_path) -> list[PageResult]:
+def extract_structured_content(pdf_path) -> List[PageResult]:
     doc = pymupdf.open(pdf_path)
     result = []
 
@@ -57,7 +54,7 @@ def extract_structured_content(pdf_path) -> list[PageResult]:
     os.makedirs(image_dir, exist_ok=True)
 
     for page_num, page in enumerate(doc, start=1):
-        page_items: list[Item] = []
+        page_items: List[Union[TextItem, ImageItem]] = []
         blocks = page.get_text("dict")["blocks"]
 
         for block in blocks:
@@ -69,7 +66,6 @@ def extract_structured_content(pdf_path) -> list[PageResult]:
                         if span["text"].strip():  # skip empty
                             page_items.append(
                                 TextItem(
-                                    type="text",
                                     text=span["text"].strip(),
                                     font=span["font"],
                                     size=span["size"],
@@ -92,9 +88,7 @@ def extract_structured_content(pdf_path) -> list[PageResult]:
                         with open(image_name, "wb") as f:
                             f.write(image_data)
                         page_items.append(
-                            ImageItem(
-                                type="image", src=image_name, bbox=bbox, page=page_num
-                            )
+                            ImageItem(src=image_name, bbox=bbox, page=page_num)
                         )
                 except Exception as e:
                     print(f"⚠️ Could not extract image on page {page_num}: {e}")
@@ -104,7 +98,7 @@ def extract_structured_content(pdf_path) -> list[PageResult]:
     return result
 
 
-def condense_matching_elements(result: list[PageResult]):
+def condense_matching_elements(result: List[PageResult]):
     """
     Iterate through the contents on each page, and concat consecutive text elements that have the same text
     styles
@@ -128,13 +122,6 @@ def condense_matching_elements(result: list[PageResult]):
         page.content = condensed_contents
 
 
-class DataclassJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if is_dataclass(obj):
-            return asdict(obj)
-        return super().default(obj)
-
-
 if __name__ == "__main__":
     import sys
 
@@ -147,8 +134,10 @@ if __name__ == "__main__":
         # Condense matching text elements
         condense_matching_elements(result)
 
-        # Write to JSON file
+        # Write to JSON file using Pydantic's JSON serialization
         with open(output_json, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2, ensure_ascii=False, cls=DataclassJSONEncoder)
+            # Convert to dict and then to JSON for better control
+            json_data = [page.model_dump() for page in result]
+            json.dump(json_data, f, indent=2, ensure_ascii=False)
 
         print(f"✅ Extraction complete: {output_json}")

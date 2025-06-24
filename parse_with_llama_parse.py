@@ -6,17 +6,18 @@ import glob
 import json
 import os
 import sys
-from typing import TypedDict
+from typing import List
 
 from dotenv import load_dotenv
 from llama_cloud_services import LlamaParse
 from llama_cloud_services.parse.types import JobMetadata, Page
+from pydantic import BaseModel
 
 load_dotenv()
 
 
-class LlamaParseOutput(TypedDict):
-    pages: list[Page]
+class LlamaParseOutput(BaseModel):
+    pages: List[Page]
     job_metadata: JobMetadata
     job_id: str  # UUID
     file_path: str
@@ -89,8 +90,12 @@ if __name__ == "__main__":
         pdf_path = sys.argv[1]
         result = parse(pdf_path)
 
-        # Save to JSON
+        # Save to JSON using Pydantic serialization
         with open(
             "output/llamaparse/llamaparse_output.json", "w", encoding="utf-8"
         ) as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
+            # Convert the result to a list of Pydantic models and then serialize
+            # Since result is a list of dicts, we need to convert each dict to a LlamaParseOutput model
+            pydantic_models = [LlamaParseOutput(**item) for item in result]
+            json_data = [model.model_dump() for model in pydantic_models]
+            json.dump(json_data, f, indent=2, ensure_ascii=False)
