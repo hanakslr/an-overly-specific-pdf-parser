@@ -1,6 +1,6 @@
 from difflib import SequenceMatcher
 
-from llama_cloud_services.parse.types import BBox, Page, PageItem
+from llama_cloud_services.parse.types import Page, PageItem
 from pydantic import BaseModel
 
 from extract_structured_pdf import PageResult, PyMuPdfItem, TextItem
@@ -10,6 +10,7 @@ class UnifiedBlock(BaseModel):
     match_method: str
     llama_item: PageItem
     fitz_items: list[PyMuPdfItem]
+    conversion_rule: str = None
 
 
 class ZippedOutputsPage(BaseModel):
@@ -21,21 +22,59 @@ class ZippedOutputsPage(BaseModel):
     unified_blocks: list[UnifiedBlock] = None
 
 
-def span_intersects_block(
-    span: tuple[float, float, float, float], block_bbox: BBox, margin: float = 5.0
-) -> bool:
-    x0, y0, x1, y1 = span
-    bx0 = block_bbox.x - margin
-    by0 = block_bbox.y - margin
-    bx1 = block_bbox.x + block_bbox.w + margin
-    by1 = block_bbox.y + block_bbox.h + margin
-    return not (x1 < bx0 or x0 > bx1 or y1 < by0 or y0 > by1)
-
-
 def fuzzy_match(a: str, b: str, threshold: float = 0.85) -> bool:
     a_norm = a.lower().strip()
     b_norm = b.lower().strip()
     return SequenceMatcher(None, a_norm, b_norm).ratio() > threshold
+
+
+def find_text_match(
+    llama_text: str, pymupdf_items: list[PyMuPdfItem], used_indices: set[int]
+) -> list[PyMuPdfItem]:
+    """
+    Find the first sequence of PyMuPDF text items that match the llama text.
+    Returns the matching items and marks their indices as used.
+    """
+    llama_text_norm = llama_text.lower().strip()
+
+    # Try to find exact matches first
+    for i, item in enumerate(pymupdf_items):
+        if i in used_indices or not isinstance(item, TextItem):
+            continue
+
+        # Check if this single item matches
+        if fuzzy_match(item.text, llama_text):
+            used_indices.add(i)
+            return [item]
+
+        # Check if we can build a match by combining consecutive text items
+        combined_text = item.text
+        matched_items = [item]
+        current_indices = {i}
+
+        # Try to combine with subsequent text items
+        for j in range(i + 1, len(pymupdf_items)):
+            if j in used_indices or not isinstance(pymupdf_items[j], TextItem):
+                break
+
+            # Add space between text items
+            combined_text += " " + pymupdf_items[j].text
+
+            if fuzzy_match(combined_text, llama_text):
+                # Found a match! Mark all items as used
+                used_indices.update(current_indices)
+                used_indices.add(j)
+                matched_items.append(pymupdf_items[j])
+                return matched_items
+            elif len(combined_text) > len(llama_text_norm) * 1.5:
+                # Stop if we've exceeded reasonable length
+                break
+            else:
+                # Continue building the combination
+                current_indices.add(j)
+                matched_items.append(pymupdf_items[j])
+
+    return []
 
 
 def match_blocks(
@@ -43,40 +82,22 @@ def match_blocks(
 ) -> list[UnifiedBlock]:
     """
     Given the output of a llama parse and a pymupdf,
-    match up the individual items into a single list using bounding
-    boxes and fuzzy matching.
+    match up the individual items into a single list using text-based matching.
+    Items are processed in order and each PyMuPDF item is only used once.
     """
     unified = []
+    used_pymupdf_indices = set()
 
     for llama_item in llama_parse_page.items:
-        fitz_matches = [
-            fitz_item
-            for fitz_item in pymupdf_page.content
-            if span_intersects_block(fitz_item.bbox, llama_item.bBox)
-        ]
+        # Find matching PyMuPDF text items
+        fitz_matches = find_text_match(
+            llama_item.value, pymupdf_page.content, used_pymupdf_indices
+        )
 
         if fitz_matches:
             unified.append(
                 UnifiedBlock(
-                    match_method="bbox", llama_item=llama_item, fitz_items=fitz_matches
-                )
-            )
-            continue
-
-        # If we didn't have overlap by bbox, check by text content
-        fitz_fuzzy_matches = [
-            fitz_item
-            for fitz_item in pymupdf_page.content
-            if isinstance(fitz_item, TextItem)
-            and fuzzy_match(fitz_item.text, llama_item.value)
-        ]
-
-        if fitz_fuzzy_matches:
-            unified.append(
-                UnifiedBlock(
-                    match_method="fuzzy",
-                    llama_item=llama_item,
-                    fitz_items=fitz_fuzzy_matches,
+                    match_method="text", llama_item=llama_item, fitz_items=fitz_matches
                 )
             )
         else:

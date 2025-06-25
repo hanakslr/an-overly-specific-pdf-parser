@@ -8,8 +8,9 @@ from pydantic import BaseModel
 from extract_structured_pdf import PyMuPDFOutput, extract
 from parse_with_llama_parse import LlamaParseOutput, parse
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
+from rule_registry import ConversionRuleRegistry
 from tiptap_models import DocNode
-from zip_llama_pymupdf import ZippedOutputsPage, match_blocks
+from zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
 
 
 class PipelineState(BaseModel):
@@ -20,6 +21,8 @@ class PipelineState(BaseModel):
     zipped_page: ZippedOutputsPage = None
 
     prose_mirror_doc: DocNode = None
+
+    current_block: UnifiedBlock = None
 
 
 def is_node_completed(state: PipelineState, step: str) -> bool:
@@ -78,11 +81,54 @@ def init_prose_mirror_doc(state: PipelineState):
 
 
 def get_next_block(state: PipelineState):
-    pass
+    return {"current_block": state.zipped_page.unified_blocks[0]}
 
 
 def get_rule_for_block(state: PipelineState):
-    pass
+    """
+    Check if any conversion rules are applicable to the current block.
+    If a rule matches, set the conversion_rule field to the rule's ID.
+    """
+    if state.current_block.conversion_rule is not None:
+        # Rule already set, no need to check again
+        return {}
+
+    # Get all available conversion rules
+    rules = ConversionRuleRegistry.get_all_rules()
+
+    # Test each rule against the current block
+    for rule in rules:
+        # For now, we'll test against the first PyMuPDF item if available
+        # In the future, we might want to test against all items or use a different strategy
+        pymupdf_input = (
+            state.current_block.fitz_items[0]
+            if state.current_block.fitz_items
+            else None
+        )
+
+        if pymupdf_input and rule.match_condition(
+            state.current_block.llama_item, pymupdf_input
+        ):
+            # Found a matching rule
+            return {
+                "current_block": state.current_block.model_copy(
+                    update={"conversion_rule": rule.id}
+                )
+            }
+
+    # No matching rule found
+    return {}
+
+
+def should_emit_block(state: PipelineState) -> str:
+    """
+    Conditional edge function to determine next step after rule checking.
+    Returns 'EmitBlock' if a conversion rule was found, 'END' otherwise.
+    """
+    if state.current_block.conversion_rule is not None:
+        return "EmitBlock"
+    else:
+        return "END"
 
 
 def make_rule_for_block(state: PipelineState):
@@ -90,7 +136,37 @@ def make_rule_for_block(state: PipelineState):
 
 
 def emit_block(state: PipelineState):
-    pass
+    """
+    Construct a node using the conversion rule and add it to the prose mirror document.
+    """
+    # Get the conversion rule by ID
+    rule_class = ConversionRuleRegistry._rules.get(state.current_block.conversion_rule)
+    if not rule_class:
+        raise ValueError(
+            f"Conversion rule '{state.current_block.conversion_rule}' not found"
+        )
+
+    # Create an instance of the rule
+    rule = rule_class()
+
+    # Get the PyMuPDF input (use first item if available)
+    pymupdf_input = (
+        state.current_block.fitz_items[0] if state.current_block.fitz_items else None
+    )
+
+    # Construct the node using the rule
+    constructed_node = rule.construct_node(
+        state.current_block.llama_item, pymupdf_input
+    )
+
+    # Add the constructed node to the prose mirror document content
+    updated_content = state.prose_mirror_doc.content + [constructed_node]
+
+    return {
+        "prose_mirror_doc": state.prose_mirror_doc.model_copy(
+            update={"content": updated_content}
+        )
+    }
 
 
 def build_pipeline():
@@ -109,14 +185,16 @@ def build_pipeline():
     builder.add_edge("ZipOutputs", "InitProseMirror")
 
     # Now we want to parse the contents
-    builder.add_node("GetNextBlock", get_next_block)
+    builder.add_node("GetNextBlock", RunnableLambda(get_next_block))
     builder.add_node("RuleForBlock", get_rule_for_block)
     builder.add_node("MakeRuleForBlock", make_rule_for_block)
     builder.add_node("EmitBlock", emit_block)
 
     builder.add_edge("InitProseMirror", "GetNextBlock")
     builder.add_edge("GetNextBlock", "RuleForBlock")
-    builder.add_edge("RuleForBlock", "EmitBlock")
+    builder.add_conditional_edges(
+        "RuleForBlock", should_emit_block, {"EmitBlock": "EmitBlock", "END": END}
+    )
     builder.add_edge("EmitBlock", END)
 
     return builder.compile()

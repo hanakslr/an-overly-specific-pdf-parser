@@ -64,27 +64,26 @@ class ConversionRule(BaseModel):
             field_value = getattr(input_obj, condition.field, None)
 
             # Apply the operator
+            condition_matches = False
             if condition.operator == "==":
-                if field_value == condition.value:
-                    return True
+                condition_matches = field_value == condition.value
             elif condition.operator == ">":
-                if field_value > condition.value:
-                    return True
+                condition_matches = field_value > condition.value
             elif condition.operator == "<":
-                if field_value < condition.value:
-                    return True
+                condition_matches = field_value < condition.value
             elif condition.operator == ">=":
-                if field_value >= condition.value:
-                    return True
+                condition_matches = field_value >= condition.value
             elif condition.operator == "<=":
-                if field_value <= condition.value:
-                    return True
+                condition_matches = field_value <= condition.value
             elif condition.operator == "in":
-                if field_value in condition.value:
-                    return True
+                condition_matches = field_value in condition.value
 
-        # If no conditions match, return False
-        return False
+            # If any condition fails, the rule doesn't match
+            if not condition_matches:
+                return False
+
+        # All conditions matched
+        return True
 
     def construct_node(llamaparse_input: PageItem, pymupdf_input: Item) -> TiptapNode:
         pass
