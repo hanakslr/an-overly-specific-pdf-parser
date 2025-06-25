@@ -22,6 +22,7 @@ class PipelineState(BaseModel):
 
     prose_mirror_doc: DocNode = None
 
+    block_index: int = 0
     current_block: UnifiedBlock = None
 
 
@@ -81,7 +82,21 @@ def init_prose_mirror_doc(state: PipelineState):
 
 
 def get_next_block(state: PipelineState):
-    return {"current_block": state.zipped_page.unified_blocks[0]}
+    """
+    Get the next block to process. If no more blocks, return None to end the pipeline.
+    """
+    # Initialize block index if not present
+
+    # Check if we have more blocks to process
+    if state.block_index >= len(state.zipped_page.unified_blocks):
+        # No more blocks, end the pipeline
+        return {}
+
+    # Get the current block
+    current_block = state.zipped_page.unified_blocks[state.block_index]
+
+    # Return the current block and increment the index
+    return {"current_block": current_block, "block_index": state.block_index + 1}
 
 
 def get_rule_for_block(state: PipelineState):
@@ -127,6 +142,18 @@ def should_emit_block(state: PipelineState) -> str:
     """
     if state.current_block.conversion_rule is not None:
         return "EmitBlock"
+    else:
+        return "END"
+
+
+def should_continue_processing(state: PipelineState) -> bool:
+    """
+    Conditional edge function to determine if we should continue processing blocks.
+    Returns 'GetNextBlock' if there are more blocks, 'END' otherwise.
+    """
+    # Check if we have more blocks to process
+    if state.block_index < len(state.zipped_page.unified_blocks):
+        return "GetNextBlock"
     else:
         return "END"
 
@@ -195,7 +222,11 @@ def build_pipeline():
     builder.add_conditional_edges(
         "RuleForBlock", should_emit_block, {"EmitBlock": "EmitBlock", "END": END}
     )
-    builder.add_edge("EmitBlock", END)
+    builder.add_conditional_edges(
+        "EmitBlock",
+        should_continue_processing,
+        {"GetNextBlock": "GetNextBlock", "END": END},
+    )
 
     return builder.compile()
 
