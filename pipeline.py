@@ -3,20 +3,13 @@ import sys
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
-from llama_cloud_services.parse.types import Page
 from pydantic import BaseModel
 
-from extract_structured_pdf import PageResult, PyMuPDFOutput, extract
+from extract_structured_pdf import PyMuPDFOutput, extract
 from parse_with_llama_parse import LlamaParseOutput, parse
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
 from tiptap_models import DocNode
-
-
-class ZippedOutputsPage(BaseModel):
-    page: int
-
-    llama_parse_page: Page
-    pymupdf_page: PageResult
+from zip_llama_pymupdf import ZippedOutputsPage, match_blocks
 
 
 class PipelineState(BaseModel):
@@ -68,10 +61,13 @@ def zip_outputs(state: PipelineState):
     """
     # Just for page 1 right now.
 
+    lp_page = state.llama_parse_output.pages[0]
+    pm_page = state.pymupdf_output.pages[0]
     zipped_page = ZippedOutputsPage(
         page=1,
-        llama_parse_page=state.llama_parse_output.pages[0],
-        pymupdf_page=state.pymupdf_output.pages[0],
+        llama_parse_page=lp_page,
+        pymupdf_page=pm_page,
+        unified_blocks=match_blocks(lp_page, pm_page),
     )
 
     return {"zipped_page": zipped_page}

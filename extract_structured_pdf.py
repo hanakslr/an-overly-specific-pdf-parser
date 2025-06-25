@@ -3,7 +3,7 @@ import os
 from typing import List, Union
 
 import pymupdf  # PyMuPDF
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Item(BaseModel):
@@ -17,14 +17,14 @@ class TextItem(Item):
     text: str
     font: str
     size: float
-    bbox: List[float] = Field(max_items=4, min_items=4)  # [x0, y0, x1, y1]
+    bbox: tuple[float, float, float, float]  # [x0, y0, x1, y1]
 
 
 class ImageItem(Item):
     type: str = "image"
     page: int
     src: str
-    bbox: List[float] = Field(max_items=4, min_items=4)  # [x0, y0, x1, y1]
+    bbox: tuple[float, float, float, float]  # [x0, y0, x1, y1]
 
 
 PyMuPdfItem = Union[TextItem, ImageItem]
