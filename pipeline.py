@@ -1,24 +1,35 @@
 import sys
-from typing import TypedDict
+from typing import Optional, Any, TypedDict
 
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, END
+from pydantic import BaseModel
 
 from extract_structured_pdf import PyMuPDFOutput, extract
 from parse_with_llama_parse import LlamaParseOutput, parse
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
 
 
-class PipelineState(TypedDict):
+class CurrentBlock(BaseModel):
+    page_index: int
+    block_index: int
+
+    # Will want to put the ConversionRule that we are going to use here
+    rule_id: str
+
+
+class PipelineState(BaseModel):
     pdf_path: str
-    llama_parse_output: LlamaParseOutput
-    pymupdf_output: PyMuPDFOutput
+    llama_parse_output: LlamaParseOutput = None
+    pymupdf_output: PyMuPDFOutput = None
+
+    current_block: Optional[CurrentBlock] = None
 
 
-def is_node_completed(state, step):
+def is_node_completed(state: PipelineState, step: str) -> bool:
     # Make this smarter as state gets more complicated.
-    return step in state and state[step]
+    return hasattr(state, step) and getattr(state, step) is not None
 
 
 def llama_parse(state: PipelineState):
@@ -28,8 +39,11 @@ def llama_parse(state: PipelineState):
         return {}
 
     print("🔄 Running LlamaParse...")
-    result = parse(state["pdf_path"])
-    return {"llama_parse_output": result}
+    result = parse(state.pdf_path)
+    # Convert the list of dictionaries to LlamaParseOutput
+    # The parse function returns a list, but we expect a single LlamaParseOutput
+    llama_parse_output = LlamaParseOutput(**result[0])
+    return {"llama_parse_output": llama_parse_output}
 
 
 def pymupdf_extract(state: PipelineState):
@@ -39,8 +53,27 @@ def pymupdf_extract(state: PipelineState):
         return {}
 
     print("🔄 Running PyMuPDF extraction...")
-    result = extract(state["pdf_path"])
-    return {"pymupdf_output": result}
+    result = extract(state.pdf_path)
+    # Convert the list of PageResult objects to PyMuPDFOutput
+    # The extract function returns a list, but we expect a PyMuPDFOutput with pages field
+    pymupdf_output = PyMuPDFOutput(pages=result)
+    return {"pymupdf_output": pymupdf_output}
+
+
+def get_next_block(state: PipelineState):
+    pass
+
+
+def get_rule_for_block(state: PipelineState):
+    pass
+
+
+def make_rule_for_block(state: PipelineState):
+    pass
+
+
+def emit_block(state: PipelineState):
+    pass
 
 
 def build_pipeline():
@@ -52,7 +85,16 @@ def build_pipeline():
     builder.set_entry_point("LlamaParse")
     builder.add_edge("LlamaParse", "PyMuPDFExtract")
 
-    builder.set_finish_point("PyMuPDFExtract")
+    # Now we want to parse the contents
+    builder.add_node("GetNextBlock", get_next_block)
+    builder.add_node("RuleForBlock", get_rule_for_block)
+    builder.add_node("MakeRuleForBlock", make_rule_for_block)
+    builder.add_node("EmitBlock", emit_block)
+
+    builder.add_edge("PyMuPDFExtract", "GetNextBlock")
+    builder.add_edge("GetNextBlock", "RuleForBlock")
+    builder.add_edge("RuleForBlock", "EmitBlock")
+    builder.add_edge("EmitBlock", END)
 
     return builder.compile()
 
@@ -67,9 +109,14 @@ if __name__ == "__main__":
 
     # Initialize state
     if resume_latest:
-        initial_state = resume_from_latest(pdf_path)
+        state_dict = resume_from_latest(pdf_path)
+        if state_dict:
+            # Convert dictionary to PipelineState object
+            initial_state = PipelineState(**state_dict)
+        else:
+            initial_state = PipelineState(pdf_path=pdf_path)
     else:
-        initial_state = {"pdf_path": pdf_path}
+        initial_state = PipelineState(pdf_path=pdf_path)
 
     graph = build_pipeline()
 

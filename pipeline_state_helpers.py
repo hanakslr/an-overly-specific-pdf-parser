@@ -49,6 +49,9 @@ class DataclassJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if is_dataclass(obj):
             return asdict(obj)
+        # Handle Pydantic models
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump()
         return super().default(obj)
 
 
