@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from extract_structured_pdf import PyMuPDFOutput, extract
 from parse_with_llama_parse import LlamaParseOutput, parse
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
+from propose_new_rule import propose_new_rule_node
 from rule_registry import ConversionRuleRegistry
 from tiptap_models import DocNode
 from zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
@@ -138,12 +139,12 @@ def get_rule_for_block(state: PipelineState):
 def should_emit_block(state: PipelineState) -> str:
     """
     Conditional edge function to determine next step after rule checking.
-    Returns 'EmitBlock' if a conversion rule was found, 'END' otherwise.
+    Returns 'EmitBlock' if a conversion rule was found, 'ProposeNewRule' otherwise.
     """
     if state.current_block.conversion_rule is not None:
         return "EmitBlock"
     else:
-        return "END"
+        return "ProposeNewRule"
 
 
 def should_continue_processing(state: PipelineState) -> bool:
@@ -214,13 +215,15 @@ def build_pipeline():
     # Now we want to parse the contents
     builder.add_node("GetNextBlock", RunnableLambda(get_next_block))
     builder.add_node("RuleForBlock", get_rule_for_block)
-    builder.add_node("MakeRuleForBlock", make_rule_for_block)
+    builder.add_node("ProposeNewRule", propose_new_rule_node)
     builder.add_node("EmitBlock", emit_block)
 
     builder.add_edge("InitProseMirror", "GetNextBlock")
     builder.add_edge("GetNextBlock", "RuleForBlock")
     builder.add_conditional_edges(
-        "RuleForBlock", should_emit_block, {"EmitBlock": "EmitBlock", "END": END}
+        "RuleForBlock",
+        should_emit_block,
+        {"EmitBlock": "EmitBlock", "ProposeNewRule": "ProposeNewRule"},
     )
     builder.add_conditional_edges(
         "EmitBlock",

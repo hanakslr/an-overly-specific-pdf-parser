@@ -85,7 +85,9 @@ class ConversionRule(BaseModel):
         # All conditions matched
         return True
 
-    def construct_node(llamaparse_input: PageItem, pymupdf_input: Item) -> TiptapNode:
+    def construct_node(
+        llamaparse_input: PageItem, pymupdf_inputs: list[Item]
+    ) -> TiptapNode:
         pass
 
 
@@ -98,7 +100,7 @@ class HeadingConversion(ConversionRule):
     output_node_type: str = "heading"
 
     def construct_node(
-        cls, llamaparse_input: PageItem, pymupdf_input: Item
+        cls, llamaparse_input: PageItem, pymupdf_inputs: list[Item]
     ) -> HeadingNode:
         return HeadingNode(
             attrs={"level": llamaparse_input.lvl},
