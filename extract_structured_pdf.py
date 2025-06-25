@@ -1,9 +1,9 @@
 import json
 import os
-from typing import Any, List, Union
+from typing import List, Union
 
 import pymupdf  # PyMuPDF
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Item(BaseModel):
@@ -17,18 +17,22 @@ class TextItem(Item):
     text: str
     font: str
     size: float
+    bbox: List[float] = Field(max_items=4, min_items=4)  # [x0, y0, x1, y1]
 
 
 class ImageItem(Item):
     type: str = "image"
     page: int
     src: str
-    bbox: Any
+    bbox: List[float] = Field(max_items=4, min_items=4)  # [x0, y0, x1, y1]
+
+
+PyMuPdfItem = Union[TextItem, ImageItem]
 
 
 class PageResult(BaseModel):
     page: int
-    content: List[Union[TextItem, ImageItem]]
+    content: List[PyMuPdfItem]
 
 
 class PyMuPDFOutput(BaseModel):
@@ -70,6 +74,7 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
                                     font=span["font"],
                                     size=span["size"],
                                     page=page_num,
+                                    bbox=span.get("bbox"),  # Get bbox from span
                                 )
                             )
 
