@@ -1,22 +1,22 @@
 import sys
-from typing import Optional, Any, TypedDict
 
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
+from llama_cloud_services.parse.types import Page
 from pydantic import BaseModel
 
-from extract_structured_pdf import PyMuPDFOutput, extract
+from extract_structured_pdf import PageResult, PyMuPDFOutput, extract
 from parse_with_llama_parse import LlamaParseOutput, parse
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
+from tiptap_models import DocNode
 
 
-class CurrentBlock(BaseModel):
-    page_index: int
-    block_index: int
+class ZippedOutputsPage(BaseModel):
+    page: int
 
-    # Will want to put the ConversionRule that we are going to use here
-    rule_id: str
+    llama_parse_page: Page
+    pymupdf_page: PageResult
 
 
 class PipelineState(BaseModel):
@@ -24,7 +24,9 @@ class PipelineState(BaseModel):
     llama_parse_output: LlamaParseOutput = None
     pymupdf_output: PyMuPDFOutput = None
 
-    current_block: Optional[CurrentBlock] = None
+    zipped_page: ZippedOutputsPage = None
+
+    prose_mirror_doc: DocNode = None
 
 
 def is_node_completed(state: PipelineState, step: str) -> bool:
@@ -60,6 +62,25 @@ def pymupdf_extract(state: PipelineState):
     return {"pymupdf_output": pymupdf_output}
 
 
+def zip_outputs(state: PipelineState):
+    """
+    Given both llama parse output and pymupdf output, zip them together.
+    """
+    # Just for page 1 right now.
+
+    zipped_page = ZippedOutputsPage(
+        page=1,
+        llama_parse_page=state.llama_parse_output.pages[0],
+        pymupdf_page=state.pymupdf_output.pages[0],
+    )
+
+    return {"zipped_page": zipped_page}
+
+
+def init_prose_mirror_doc(state: PipelineState):
+    return {"prose_mirror_doc": DocNode(content=[])}
+
+
 def get_next_block(state: PipelineState):
     pass
 
@@ -85,13 +106,19 @@ def build_pipeline():
     builder.set_entry_point("LlamaParse")
     builder.add_edge("LlamaParse", "PyMuPDFExtract")
 
+    builder.add_node("ZipOutputs", RunnableLambda(zip_outputs))
+    builder.add_edge("PyMuPDFExtract", "ZipOutputs")
+
+    builder.add_node("InitProseMirror", RunnableLambda(init_prose_mirror_doc))
+    builder.add_edge("ZipOutputs", "InitProseMirror")
+
     # Now we want to parse the contents
     builder.add_node("GetNextBlock", get_next_block)
     builder.add_node("RuleForBlock", get_rule_for_block)
     builder.add_node("MakeRuleForBlock", make_rule_for_block)
     builder.add_node("EmitBlock", emit_block)
 
-    builder.add_edge("PyMuPDFExtract", "GetNextBlock")
+    builder.add_edge("InitProseMirror", "GetNextBlock")
     builder.add_edge("GetNextBlock", "RuleForBlock")
     builder.add_edge("RuleForBlock", "EmitBlock")
     builder.add_edge("EmitBlock", END)
