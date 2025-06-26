@@ -1,8 +1,8 @@
-from rule_registry import ConversionRule, RuleCondition
-from tiptap_models import ParagraphNode, TextNode
 from llama_cloud_services.parse.types import PageItem
 
 from extract_structured_pdf import Item
+from rule_registry import ConversionRule, RuleCondition
+from tiptap_models import ParagraphNode, TextNode
 
 
 class LlamaparseTextToParagraphConversion(ConversionRule):

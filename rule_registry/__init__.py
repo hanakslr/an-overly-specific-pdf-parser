@@ -3,7 +3,6 @@ Rules are how our structured PDF input gets translated to ProseMirror JSON.
 """
 
 import importlib
-import os
 from pathlib import Path
 from typing import Any, Literal, Optional
 

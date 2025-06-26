@@ -1,9 +1,10 @@
 import sys
+from typing import Optional
 
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 from extract_structured_pdf import PyMuPDFOutput, extract
 from parse_with_llama_parse import LlamaParseOutput, parse
@@ -20,12 +21,33 @@ class PipelineState(BaseModel):
     llama_parse_output: LlamaParseOutput = None
     pymupdf_output: PyMuPDFOutput = None
 
-    zipped_page: ZippedOutputsPage = None
+    zipped_pages: list[ZippedOutputsPage] = None
 
     prose_mirror_doc: DocNode = None
 
-    block_index: int = 0
-    current_block: UnifiedBlock = None
+    block_index: Optional[int] = 0
+    page_index: Optional[int] = 0
+
+    @computed_field
+    @property
+    def current_block(self) -> Optional[UnifiedBlock]:
+        if self.page_index is None or self.block_index is None:
+            return None
+
+        if self.page_index >= len(self.zipped_pages):
+            return None
+
+        if self.block_index >= len(self.zipped_pages[self.page_index].unified_blocks):
+            return None
+
+        return self.zipped_pages[self.page_index].unified_blocks[self.block_index]
+
+    @current_block.setter
+    def current_block(self, new_current_block: UnifiedBlock) -> None:
+        # This will throw out of bounds if needed.
+        self.zipped_pages[self.page_index].unified_blocks[self.block_index] = (
+            new_current_block
+        )
 
 
 def is_node_completed(state: PipelineState, step: str) -> bool:
@@ -65,18 +87,21 @@ def zip_outputs(state: PipelineState):
     """
     Given both llama parse output and pymupdf output, zip them together.
     """
-    # Just for page 1 right now.
+    assert len(state.llama_parse_output.pages) == len(state.pymupdf_output.pages)
 
-    lp_page = state.llama_parse_output.pages[0]
-    pm_page = state.pymupdf_output.pages[0]
-    zipped_page = ZippedOutputsPage(
-        page=1,
-        llama_parse_page=lp_page,
-        pymupdf_page=pm_page,
-        unified_blocks=match_blocks(lp_page, pm_page),
-    )
+    pages = []
+    for i in range(len(state.llama_parse_output.pages)):
+        lp_page = state.llama_parse_output.pages[i]
+        pm_page = state.pymupdf_output.pages[i]
+        zipped_page = ZippedOutputsPage(
+            page=i,
+            llama_parse_page=lp_page,
+            pymupdf_page=pm_page,
+            unified_blocks=match_blocks(lp_page, pm_page),
+        )
+        pages.append(zipped_page)
 
-    return {"zipped_page": zipped_page}
+    return {"zipped_pages": pages}
 
 
 def init_prose_mirror_doc(state: PipelineState):
@@ -87,18 +112,16 @@ def get_next_block(state: PipelineState):
     """
     Get the next block to process. If no more blocks, return None to end the pipeline.
     """
-    # Initialize block index if not present
+    # Check if we have more blocks to process on our current page
+    if state.block_index < len(state.zipped_pages[state.page_index].unified_blocks):
+        return {"block_index": state.block_index + 1}
 
-    # Check if we have more blocks to process
-    if state.block_index >= len(state.zipped_page.unified_blocks):
-        # No more blocks, end the pipeline
-        return {}
+    # No more block on the page - got any more pages?
+    if state.page_index < len(state.zipped_pages):
+        return {"block_index": 0, "page_index": state.page_index + 1}
 
-    # Get the current block
-    current_block = state.zipped_page.unified_blocks[state.block_index]
-
-    # Return the current block and increment the index
-    return {"current_block": current_block, "block_index": state.block_index + 1}
+    # No more pages and no more blocks
+    return {"block_index": None, "page_index": None}
 
 
 def get_rule_for_block(state: PipelineState):
@@ -149,23 +172,20 @@ def should_emit_block(state: PipelineState) -> str:
 def should_continue_processing(state: PipelineState) -> bool:
     """
     Conditional edge function to determine if we should continue processing blocks.
-    Returns 'GetNextBlock' if there are more blocks, 'END' otherwise.
+    Returns 'RuleForBlock' if there is a block we should process, 'END' otherwise.
     """
     # Check if we have more blocks to process
-    if state.block_index < len(state.zipped_page.unified_blocks):
-        return "GetNextBlock"
+    if state.block_index is not None and state.page_index is not None:
+        return "RuleForBlock"
     else:
         return "END"
-
-
-def make_rule_for_block(state: PipelineState):
-    pass
 
 
 def emit_block(state: PipelineState):
     """
     Construct a node using the conversion rule and add it to the prose mirror document.
     """
+
     # Get the conversion rule by ID
     rule_class = ConversionRuleRegistry._rules.get(state.current_block.conversion_rule)
     if not rule_class:
@@ -225,6 +245,13 @@ def build_pipeline():
     builder.add_node("EmitBlock", emit_block)
 
     builder.add_edge("InitProseMirror", "GetNextBlock")
+
+    builder.add_conditional_edges(
+        "GetNextBlock",
+        should_continue_processing,
+        {"RuleForBlock": "RuleForBlock", "END": END},
+    )
+
     builder.add_edge("GetNextBlock", "RuleForBlock")
     builder.add_conditional_edges(
         "RuleForBlock",
@@ -233,11 +260,7 @@ def build_pipeline():
     )
     builder.add_edge("ProposeNewRule", "EmitBlock")
     builder.add_edge("EmitBlock", "UpdateLiveEditor")
-    builder.add_conditional_edges(
-        "EmitBlock",
-        should_continue_processing,
-        {"GetNextBlock": "GetNextBlock", "END": END},
-    )
+    builder.add_edge("EmitBlock", "GetNextBlock")
 
     return builder.compile()
 

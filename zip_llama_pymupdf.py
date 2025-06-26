@@ -35,6 +35,9 @@ def find_text_match(
     Find the first sequence of PyMuPDF text items that match the llama text.
     Returns the matching items and marks their indices as used.
     """
+    if not llama_text:
+        return []
+
     llama_text_norm = llama_text.lower().strip()
 
     # Try to find exact matches first

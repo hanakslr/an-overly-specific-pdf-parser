@@ -48,6 +48,11 @@ def save_images(parser, json_objs, image_dir):
     Download and save the image that were identified in this doc.
     """
     job_id = json_objs[0]["job_id"]
+    metadata = json_objs[0]["job_metadata"]
+
+    if metadata["job_is_cache_hit"]:
+        print("Cache hit - images already downloaded.")
+        return
 
     # Create image output directory
 
