@@ -48,8 +48,12 @@ def append_to_document(
     """
     url = f"{server_url}/api/append-to-doc"
 
+    payload = {"new_nodes": [c.model_dump() for c in content]}
+
+    print(f"New content: {payload}")
+
     try:
-        response = requests.post(url, json=[c.model_dump() for c in content])
+        response = requests.post(url, json=payload)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:

@@ -1,4 +1,9 @@
 import json
+from pathlib import Path
+import subprocess
+import tempfile
+import importlib.util
+import sys
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -9,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from generate_tiptap_node_schema import generate_node_types_summary
 from rule_registry import ConversionRuleRegistry, RuleCondition
+from tiptap_live_editor_helper import append_to_document
 from zip_llama_pymupdf import UnifiedBlock
 
 my_llm = ChatOpenAI(model="gpt-4o", temperature=0)
@@ -22,13 +28,13 @@ class RuleProposal(BaseModel):
         description="A human-readable description of what this rule does, e.g., 'Converts LlamaParse heading items to Tiptap heading nodes'"
     )
     conditions: list[RuleCondition] = Field(
-        description="A list of conditions that must be met for this rule to apply. Each condition specifies a source (llamaparse or pymupdf), field, operator, and value"
+        description="A list of conditions that must be met for this rule to apply. Each condition specifies a source (llamaparse or pymupdf), field, operator, and value. It should be as general as possible."
     )
     output_node_type: str = Field(
         description="The type of Tiptap node this rule produces, e.g., 'heading', 'paragraph', 'listItem', etc. This comes directly from the type field of the relevant TiptapNode sublass that is being created."
     )
     construct_node_function: str = Field(
-        description="Python code as a string that constructs the Tiptap node. It's signature is `def construct_node(cls, llamaparse_input: PageItem, pymupdf_inputs: list[Item])` and returns a TiptapNode. Example: 'return HeadingNode(attrs={\"level\": llamaparse_input.lvl}, content=[TextNode(text=llamaparse_input.value)])'"
+        description="The function body of python code as a string that constructs the Tiptap node. It's signature is `def construct_node(cls, llamaparse_input: PageItem, pymupdf_inputs: list[Item])` and returns a TiptapNode. Example: 'return HeadingNode(attrs={\"level\": llamaparse_input.lvl}, content=[TextNode(text=llamaparse_input.value)])' This should only be the function body and not include the signature."
     )
 
 
@@ -78,8 +84,176 @@ def human_approval_step(rule_proposal):
 human_approval = RunnableLambda(human_approval_step)
 
 
+def test_rule_with_block(temp_file_path: Path, block: UnifiedBlock):
+    """
+    Test the rule by dynamically importing it and calling construct_node with the block.
+    """
+    try:
+        # Dynamically import the temporary rule file
+        spec = importlib.util.spec_from_file_location("temp_rule", temp_file_path)
+        temp_module = importlib.util.module_from_spec(spec)
+        sys.modules["temp_rule"] = temp_module
+        spec.loader.exec_module(temp_module)
+
+        # Find the ConversionRule class in the module
+        rule_class = None
+        for attr_name in dir(temp_module):
+            attr = getattr(temp_module, attr_name)
+            if hasattr(attr, "__bases__") and any(
+                "ConversionRule" in str(base) for base in attr.__bases__
+            ):
+                rule_class = attr
+                break
+
+        if not rule_class:
+            print("❌ Could not find ConversionRule class in the file")
+            return False
+
+        # Create an instance of the rule class
+        rule_instance = rule_class()
+
+        # Test if the rule matches the block
+        if not rule_instance.match_condition(
+            block.llama_item, block.fitz_items[0] if block.fitz_items else None
+        ):
+            print("❌ Rule conditions do not match the block")
+            return False
+
+        # Call construct_node with the block
+        result_node = rule_instance.construct_node(block.llama_item, block.fitz_items)
+
+        # Check if the result is a valid TiptapNode
+        from tiptap_models import TiptapNode
+
+        if isinstance(result_node, TiptapNode):
+            print(f"✅ Rule generated valid {type(result_node).__name__}")
+            print(f"Node content: {result_node}")
+
+            # Append to document
+            append_to_document([result_node])
+            print("✅ Node appended to document")
+            return True
+        else:
+            print(f"❌ Rule returned {type(result_node).__name__}, expected TiptapNode")
+            return False
+
+    except Exception as e:
+        print(f"❌ Error testing rule: {e}")
+        return False
+
+
+def review_and_compile(rule_and_context):
+    # Extract rule and block from the context
+    if isinstance(rule_and_context, dict):
+        rule = rule_and_context.get("rule")
+        block = rule_and_context.get("block")
+    else:
+        rule = rule_and_context
+        block = None
+
+    # 1. Generate class text
+    class_code = generate_conversion_class(rule)
+
+    # 2. Open in Cursor editor - create file in rule_registry directory
+    rule_registry_dir = Path("rule_registry")
+    temp_file_path = rule_registry_dir / f"temp_{rule.id}_conversion.py"
+
+    # Write the generated code to the file
+    temp_file_path.write_text(class_code)
+    edited_code = class_code
+
+    def reload():
+        nonlocal edited_code
+        edited_code = temp_file_path.read_text()
+        print("[bold blue]Final Edited Rule Class:[/bold blue]")
+        print(edited_code)
+
+        # Test the rule with the block if available
+        if block:
+            print("\n🧪 Testing rule with current block...")
+            test_rule_with_block(temp_file_path, block)
+
+    while True:
+        # Show block context if available
+        if block:
+            print("\n[bold yellow]Block being converted:[/bold yellow]")
+            print(f"LlamaParse: {block.llama_item}")
+            print(f"PyMuPDF items: {len(block.fitz_items)} items")
+            print("---")
+
+        # Open in Cursor
+        subprocess.call(["cursor", str(temp_file_path)])
+
+        # 4. Ask for user decision
+        print("\nOptions:")
+        print("a - Accept and save rule")
+        print("r - Reload and edit again")
+        print("x - Reject and exit")
+
+        choice = input("Choose (a/r/x): ").lower().strip()
+
+        if choice == "a":
+            # Accept and save the rule
+            final_file_path = rule_registry_dir / f"{rule.id}.py"
+            final_file_path.write_text(edited_code)
+
+            # Clean up the temporary file
+            temp_file_path.unlink(missing_ok=True)
+
+            print(f"✅ Rule saved to: {final_file_path}")
+            return {
+                "rule": rule,
+                "code": edited_code,
+                "file_path": str(final_file_path),
+            }
+
+        elif choice == "r":
+            # Reload - continue the loop to edit again
+            reload()
+            print("🔄 Reloading for editing...")
+            continue
+
+        elif choice == "x":
+            # Reject - clean up and raise exception
+            temp_file_path.unlink(missing_ok=True)
+            raise ValueError("Rule was rejected by user")
+
+        else:
+            print("Invalid choice. Please enter 'a', 'r', or 'x'.")
+            continue
+
+
+# ------- Conversion class ----------
+def generate_conversion_class(rule: RuleProposal) -> str:
+    # Format each condition line
+    condition_lines = ",\n        ".join(
+        [
+            f'RuleCondition(source="{c.source}", field="{c.field}", operator="{c.operator}", value="{c.value}")'
+            for c in rule.conditions
+        ]
+    )
+
+    return f'''from rule_registry import ConversionRule, RuleCondition
+from tiptap_models import {rule.output_node_type.title()}Node
+from llama_cloud_services.parse.types import PageItem
+
+from extract_structured_pdf import Item
+
+class {rule.id.title().replace("_", "")}Conversion(ConversionRule):
+    id: str = "{rule.id}"
+    description: str = "{rule.description}"
+    conditions: list[RuleCondition] = [
+        {condition_lines}
+    ]
+    output_node_type: str = "{rule.output_node_type}"
+
+    def construct_node(cls, llamaparse_input: PageItem, pymupdf_inputs: list[Item]) -> {rule.output_node_type.title()}Node:
+        {rule.construct_node_function}
+'''
+
+
 # ---- LangChain LLM chain to propose a new rule ----
-def make_llm_chain(llm, parser):
+def make_llm_chain(llm, parser, block):
     prompt = ChatPromptTemplate.from_messages(
         [
             (
@@ -108,8 +282,18 @@ Return the result as JSON following this schema:
         ]
     )
 
+    # Create a function that combines the rule with the block context
+    def combine_rule_with_context(rule):
+        return {"rule": rule, "block": block}
+
     # Create the chain
-    chain = prompt | llm | parser | human_approval
+    chain = (
+        prompt
+        | llm
+        | parser
+        | RunnableLambda(combine_rule_with_context)
+        | RunnableLambda(review_and_compile)
+    )
 
     return chain
 
@@ -133,7 +317,7 @@ def propose_new_rule_node(state):
     format_instructions = parser.get_format_instructions()
 
     # Create the LLM chain
-    llm_chain = make_llm_chain(my_llm, parser)
+    llm_chain = make_llm_chain(my_llm, parser, block)
 
     # Generate the rule
     result = llm_chain.invoke(
@@ -145,9 +329,11 @@ def propose_new_rule_node(state):
         }
     )
 
+    print(f"Results of chain: {result}")
+
     # Return the result in the format expected by the pipeline
     return {
         "current_block": state.current_block.model_copy(
-            update={"conversion_rule": result.id}
+            update={"conversion_rule": result["rule"].id}
         )
     }

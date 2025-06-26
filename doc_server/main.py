@@ -43,8 +43,13 @@ def update_doc(payload: DocPayload):
     return {"status": "ok"}
 
 
+class AppendPayload(BaseModel):
+    new_nodes: list[Any]
+
+
 @app.post("/api/append-to-doc")
-def append_to_doc(payload):
+def append_to_doc(payload: AppendPayload):
     global doc_state
-    doc_state["content"].extend(payload)
+    print(f"Recieved {payload}")
+    doc_state["content"].extend(payload.new_nodes)
     return {"status": "ok"}

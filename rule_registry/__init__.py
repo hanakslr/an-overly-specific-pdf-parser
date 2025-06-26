@@ -5,7 +5,7 @@ Rules are how our structured PDF input gets translated to ProseMirror JSON.
 import importlib
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from llama_cloud_services.parse.types import PageItem
 from pydantic import BaseModel
@@ -82,7 +82,9 @@ class ConversionRule(BaseModel):
         # Register the class after it's fully defined
         ConversionRuleRegistry._rules[cls.id] = cls
 
-    def match_condition(cls, llamaparse_input: PageItem, pymupdf_input: Item) -> bool:
+    def match_condition(
+        cls, llamaparse_input: PageItem, pymupdf_input: Optional[Item]
+    ) -> bool:
         for condition in cls.conditions:
             # Get the appropriate input object based on source
             if condition.source == "llamaparse":
