@@ -10,6 +10,7 @@ from parse_with_llama_parse import LlamaParseOutput, parse
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
 from propose_new_rule import propose_new_rule_node
 from rule_registry import ConversionRuleRegistry
+from tiptap_live_editor_helper import update_document
 from tiptap_models import DocNode
 from zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
 
@@ -197,6 +198,11 @@ def emit_block(state: PipelineState):
     }
 
 
+def update_live_editor(state: PipelineState):
+    if state.prose_mirror_doc:
+        update_document(state.prose_mirror_doc)
+
+
 def build_pipeline():
     builder = StateGraph(state_schema=PipelineState)
 
@@ -212,6 +218,8 @@ def build_pipeline():
     builder.add_node("InitProseMirror", RunnableLambda(init_prose_mirror_doc))
     builder.add_edge("ZipOutputs", "InitProseMirror")
 
+    builder.add_node("UpdateLiveEditor", RunnableLambda(update_live_editor))
+
     # Now we want to parse the contents
     builder.add_node("GetNextBlock", RunnableLambda(get_next_block))
     builder.add_node("RuleForBlock", get_rule_for_block)
@@ -225,6 +233,7 @@ def build_pipeline():
         should_emit_block,
         {"EmitBlock": "EmitBlock", "ProposeNewRule": "ProposeNewRule"},
     )
+    builder.add_edge("EmitBlock", "UpdateLiveEditor")
     builder.add_conditional_edges(
         "EmitBlock",
         should_continue_processing,
@@ -248,6 +257,7 @@ if __name__ == "__main__":
         if state_dict:
             # Convert dictionary to PipelineState object
             initial_state = PipelineState(**state_dict)
+            update_live_editor(initial_state)
         else:
             initial_state = PipelineState(pdf_path=pdf_path)
     else:

@@ -13,3 +13,11 @@ There is a rule registry that contains rules for converting llamaparse and pymup
 This is a work in process.
 
 ![Pipeline Diagram](pipeline_diagram.png)
+
+## Local testing window
+
+There is a FastAPI that serves up ProseMirror JSON.
+`uv run uvicorn main:app --reload`
+
+And an editor that can display it
+`cd tiptap && pnpm dev`

@@ -39,6 +39,7 @@ def resume_from_latest(pdf_path: str):
     latest_state = get_latest_output(pdf_path)
     if latest_state:
         print(f"🔄 Resuming from latest output for: {pdf_path}")
+
         return latest_state
     else:
         print("🆕 Starting fresh pipeline")

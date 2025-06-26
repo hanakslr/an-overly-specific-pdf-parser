@@ -6,11 +6,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "dotenv>=0.9.9",
+    "fastapi>=0.115.13",
     "langchain>=0.3.26",
     "langchain-openai>=0.3.25",
     "langgraph>=0.4.8",
     "llama-parse>=0.6.35",
     "pymupdf>=1.26.1",
+    "uvicorn>=0.34.3",
 ]
 
 [dependency-groups]
