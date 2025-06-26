@@ -123,9 +123,7 @@ def get_rule_for_block(state: PipelineState):
             else None
         )
 
-        if pymupdf_input and rule.match_condition(
-            state.current_block.llama_item, pymupdf_input
-        ):
+        if rule.match_condition(state.current_block.llama_item, pymupdf_input):
             # Found a matching rule
             return {
                 "current_block": state.current_block.model_copy(
@@ -233,6 +231,7 @@ def build_pipeline():
         should_emit_block,
         {"EmitBlock": "EmitBlock", "ProposeNewRule": "ProposeNewRule"},
     )
+    builder.add_edge("ProposeNewRule", "EmitBlock")
     builder.add_edge("EmitBlock", "UpdateLiveEditor")
     builder.add_conditional_edges(
         "EmitBlock",
