@@ -1,8 +1,8 @@
 from llama_cloud_services.parse.types import PageItem
-from tiptap_models import ParagraphNode, TextNode
 
 from etl.pymupdf_parse import Item
-from rule_registry import ConversionRule, RuleCondition
+from rule_registry.conversion_rules import ConversionRule, RuleCondition
+from tiptap.tiptap_models import ParagraphNode, TextNode
 
 
 class LlamaparseTextToParagraphConversion(ConversionRule):

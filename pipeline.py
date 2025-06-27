@@ -309,7 +309,11 @@ if __name__ == "__main__":
             config={"memory": memory, "recursion_limit": 100},
             stream_mode="debug",
         ):
-            state = state_snapshot["payload"]["input"]  # capture latest full state
+            payload = state_snapshot.get("payload", None)
+            if payload:
+                input = payload.get("input")
+                if input:
+                    state = input
     except Exception as e:
         print(f"Got error: {e=}")
     finally:

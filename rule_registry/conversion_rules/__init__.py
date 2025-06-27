@@ -41,7 +41,7 @@ class ConversionRuleRegistry:
                 continue
 
             # Import the module to trigger __init_subclass__ registration
-            module_name = f"rule_registry.{file_path.stem}"
+            module_name = f"rule_registry.conversion_rules.{file_path.stem}"
             try:
                 importlib.import_module(module_name)
             except ImportError as e:

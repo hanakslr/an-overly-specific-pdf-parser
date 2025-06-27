@@ -14,6 +14,7 @@ from doc_server.helpers import append_to_document
 from etl.zip_llama_pymupdf import UnifiedBlock
 from rule_registry.conversion_rules import ConversionRuleRegistry, RuleCondition
 from rule_registry.propose.tiptap_node_summary import generate_node_types_summary
+from tiptap.tiptap_models import TiptapNode
 
 my_llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
@@ -113,7 +114,6 @@ def test_rule_with_block(temp_file_path: Path, block: UnifiedBlock):
         result_node = rule_instance.construct_node(block.llama_item, block.fitz_items)
 
         # Check if the result is a valid TiptapNode
-        from tiptap_models import TiptapNode
 
         if isinstance(result_node, TiptapNode):
             print(f"✅ Rule generated valid {type(result_node).__name__}")
@@ -145,7 +145,7 @@ def review_and_compile(rule_and_context):
     class_code = generate_conversion_class(rule)
 
     # 2. Open in Cursor editor - create file in rule_registry directory
-    rule_registry_dir = Path("rule_registry")
+    rule_registry_dir = Path("rule_registry/conversion_rules")
     temp_file_path = rule_registry_dir / f"temp_{rule.id}_conversion.py"
 
     # Write the generated code to the file
@@ -223,11 +223,11 @@ def generate_conversion_class(rule: RuleProposal) -> str:
         ]
     )
 
-    return f'''from rule_registry import ConversionRule, RuleCondition
-from tiptap_models import {rule.output_node_type.title()}Node
+    return f'''from rule_registry.conversion_rules import ConversionRule, RuleCondition
+from tiptap.tiptap_models import TextNode, {rule.output_node_type.title()}Node
 from llama_cloud_services.parse.types import PageItem
 
-from extract_structured_pdf import Item
+from etl.pymupdf_parse import Item
 
 class {rule.id.title().replace("_", "")}Conversion(ConversionRule):
     id: str = "{rule.id}"
