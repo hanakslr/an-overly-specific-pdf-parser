@@ -1,4 +1,5 @@
 from difflib import SequenceMatcher
+from typing import Optional
 
 from llama_cloud_services.parse.types import Page, PageItem
 from pydantic import BaseModel
@@ -10,7 +11,7 @@ class UnifiedBlock(BaseModel):
     match_method: str
     llama_item: PageItem
     fitz_items: list[PyMuPdfItem]
-    conversion_rule: str = None
+    conversion_rule: Optional[str] = None
 
 
 class ZippedOutputsPage(BaseModel):

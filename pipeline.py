@@ -57,7 +57,7 @@ def is_node_completed(state: PipelineState, step: str) -> bool:
 
 def llama_parse(state: PipelineState):
     # Check if already completed
-    if is_node_completed(state, "llama_parse_output"):
+    if state.llama_parse_output:
         print("⏭️  LlamaParse already completed, skipping...")
         return {}
 
@@ -71,7 +71,7 @@ def llama_parse(state: PipelineState):
 
 def pymupdf_extract(state: PipelineState):
     # Check if already completed
-    if is_node_completed(state, "pymupdf_output"):
+    if state.pymupdf_output:
         print("⏭️  PyMuPDF extraction already completed, skipping...")
         return {}
 
@@ -87,6 +87,10 @@ def zip_outputs(state: PipelineState):
     """
     Given both llama parse output and pymupdf output, zip them together.
     """
+    if state.zipped_pages:
+        print("⏭️  Zipping pages already completed, skipping...")
+        return {}
+
     assert len(state.llama_parse_output.pages) == len(state.pymupdf_output.pages)
 
     pages = []
@@ -105,6 +109,9 @@ def zip_outputs(state: PipelineState):
 
 
 def init_prose_mirror_doc(state: PipelineState):
+    if state.prose_mirror_doc:
+        print("⏭️  ProseMirror init already completed, skipping...")
+        return {}
     return {"prose_mirror_doc": DocNode(content=[])}
 
 
@@ -112,6 +119,7 @@ def get_next_block(state: PipelineState):
     """
     Get the next block to process. If no more blocks, return None to end the pipeline.
     """
+    print(f"\n\n➡️  Getting next block after {state.page_index=} {state.block_index=}")
     # Check if we have more blocks to process on our current page
     if state.block_index < len(state.zipped_pages[state.page_index].unified_blocks) - 1:
         return {
@@ -188,7 +196,7 @@ def emit_block(state: PipelineState):
     """
     Construct a node using the conversion rule and add it to the prose mirror document.
     """
-
+    print(f"✏️  Emiting node using {state.current_block.conversion_rule}")
     # Get the conversion rule by ID
     rule_class = ConversionRuleRegistry._rules.get(state.current_block.conversion_rule)
     if not rule_class:
@@ -293,8 +301,18 @@ if __name__ == "__main__":
     draw_pipeline(graph)
 
     memory = MemorySaver()
+    state = initial_state
 
-    final_state = graph.invoke(initial_state, config={"memory": memory})
-    output_filename = save_output(pdf_path, final_state)
+    try:
+        for state_snapshot in graph.stream(
+            initial_state,
+            config={"memory": memory, "recursion_limit": 100},
+            stream_mode="debug",
+        ):
+            state = state_snapshot  # capture latest full state
+    except Exception as e:
+        print(f"Got error: {e=}")
+    finally:
+        output_filename = save_output(pdf_path, state)
 
     print(f"✅ Pipeline complete. Output saved to: {output_filename}")
