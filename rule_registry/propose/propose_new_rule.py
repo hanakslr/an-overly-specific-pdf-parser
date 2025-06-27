@@ -7,14 +7,13 @@ from pathlib import Path
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda
-from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
-from generate_tiptap_node_schema import generate_node_types_summary
-from rule_registry import ConversionRuleRegistry, RuleCondition
-from tiptap_live_editor_helper import append_to_document
-from zip_llama_pymupdf import UnifiedBlock
+from doc_server.helpers import append_to_document
+from etl.zip_llama_pymupdf import UnifiedBlock
+from rule_registry.conversion_rules import ConversionRuleRegistry, RuleCondition
+from rule_registry.propose.tiptap_node_summary import generate_node_types_summary
 
 my_llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
@@ -59,14 +58,6 @@ def _query_similar_rules_impl(block: UnifiedBlock, top_k: int = 5) -> str:
         except Exception:
             continue
     return json.dumps(matches[:top_k], indent=2)
-
-
-@tool
-def query_similar_rules(block: UnifiedBlock, top_k: int = 5) -> str:
-    """
-    Return top K rules that match this block. Returns JSON summary of matches.
-    """
-    return _query_similar_rules_impl(block, top_k)
 
 
 def human_approval_step(rule_proposal):

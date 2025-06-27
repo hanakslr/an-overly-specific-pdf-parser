@@ -6,14 +6,14 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, computed_field
 
-from extract_structured_pdf import PyMuPDFOutput, extract
-from parse_with_llama_parse import LlamaParseOutput, parse
+from doc_server.helpers import update_document
+from etl.llama_parse import LlamaParseOutput, parse
+from etl.pymupdf_parse import PyMuPDFOutput, extract
+from etl.zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
-from propose_new_rule import propose_new_rule_node
-from rule_registry import ConversionRuleRegistry
-from tiptap_live_editor_helper import update_document
-from tiptap_models import DocNode
-from zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
+from rule_registry.conversion_rules import ConversionRuleRegistry
+from rule_registry.propose.propose_new_rule import propose_new_rule_node
+from tiptap.tiptap_models import DocNode
 
 
 class PipelineState(BaseModel):

@@ -54,7 +54,7 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
 
     # We will store images in images/pymupdf/{pdf_path}
     # Ensure the image output directory exists
-    image_dir = f"images/pymupdf/{os.path.basename(pdf_path)}"
+    image_dir = f"output/images/pymupdf/{os.path.basename(pdf_path)}"
     os.makedirs(image_dir, exist_ok=True)
 
     for page_num, page in enumerate(doc, start=1):

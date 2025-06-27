@@ -4,7 +4,7 @@ from typing import Optional
 from llama_cloud_services.parse.types import Page, PageItem
 from pydantic import BaseModel
 
-from extract_structured_pdf import PageResult, PyMuPdfItem, TextItem
+from etl.pymupdf_parse import PageResult, PyMuPdfItem, TextItem
 
 
 class UnifiedBlock(BaseModel):

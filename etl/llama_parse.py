@@ -32,7 +32,7 @@ def parse(pdf_path: str):
         api_key=os.getenv("LLAMA_PARSE_API_KEY"), verbose=True, premium_mode=True
     )
     json_objs = parser.get_json_result(file_path=pdf_path)
-    image_dir = f"images/llamaparse/{os.path.basename(pdf_path)}"
+    image_dir = f"output/images/llamaparse/{os.path.basename(pdf_path)}"
 
     save_images(parser, json_objs, image_dir)
 
