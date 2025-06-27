@@ -25,8 +25,8 @@ class PipelineState(BaseModel):
 
     prose_mirror_doc: DocNode = None
 
-    block_index: Optional[int] = 0
-    page_index: Optional[int] = 0
+    block_index: Optional[int] = -1
+    page_index: Optional[int] = -1
 
     @computed_field
     @property
@@ -42,12 +42,12 @@ class PipelineState(BaseModel):
 
         return self.zipped_pages[self.page_index].unified_blocks[self.block_index]
 
-    @current_block.setter
-    def current_block(self, new_current_block: UnifiedBlock) -> None:
-        # This will throw out of bounds if needed.
-        self.zipped_pages[self.page_index].unified_blocks[self.block_index] = (
-            new_current_block
-        )
+    def update_current_block(self, new_block: UnifiedBlock):
+        """Safely update the block at the current page/block index."""
+        if self.page_index is None or self.block_index is None:
+            raise IndexError("page_index or block_index is not set")
+
+        self.zipped_pages[self.page_index].unified_blocks[self.block_index] = new_block
 
 
 def is_node_completed(state: PipelineState, step: str) -> bool:
@@ -94,7 +94,7 @@ def zip_outputs(state: PipelineState):
         lp_page = state.llama_parse_output.pages[i]
         pm_page = state.pymupdf_output.pages[i]
         zipped_page = ZippedOutputsPage(
-            page=i,
+            page=i + 1,
             llama_parse_page=lp_page,
             pymupdf_page=pm_page,
             unified_blocks=match_blocks(lp_page, pm_page),
@@ -113,11 +113,14 @@ def get_next_block(state: PipelineState):
     Get the next block to process. If no more blocks, return None to end the pipeline.
     """
     # Check if we have more blocks to process on our current page
-    if state.block_index < len(state.zipped_pages[state.page_index].unified_blocks):
-        return {"block_index": state.block_index + 1}
+    if state.block_index < len(state.zipped_pages[state.page_index].unified_blocks) - 1:
+        return {
+            "block_index": state.block_index + 1,
+            "page_index": max(state.page_index, 0),
+        }
 
     # No more block on the page - got any more pages?
-    if state.page_index < len(state.zipped_pages):
+    if state.page_index < len(state.zipped_pages) - 1:
         return {"block_index": 0, "page_index": state.page_index + 1}
 
     # No more pages and no more blocks
@@ -148,11 +151,11 @@ def get_rule_for_block(state: PipelineState):
 
         if rule.match_condition(state.current_block.llama_item, pymupdf_input):
             # Found a matching rule
-            return {
-                "current_block": state.current_block.model_copy(
-                    update={"conversion_rule": rule.id}
-                )
-            }
+            new_block = state.current_block.model_copy(
+                update={"conversion_rule": rule.id}
+            )
+            state.update_current_block(new_block)
+            return {"current_block": state.current_block}
 
     # No matching rule found
     return {}
