@@ -108,6 +108,54 @@
         }
       },
       "defining": false
+    },
+    "table": {
+      "group": "block",
+      "content": "tableRow+",
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "tableRow": {
+      "group": null,
+      "content": "(tableCell | tableHeader)*",
+      "marks": null,
+      "attrs": {},
+      "defining": false
+    },
+    "tableCell": {
+      "group": null,
+      "content": "block+",
+      "marks": null,
+      "attrs": {
+        "colspan": {
+          "default": 1
+        },
+        "rowspan": {
+          "default": 1
+        },
+        "colwidth": {
+          "default": null
+        }
+      },
+      "defining": false
+    },
+    "tableHeader": {
+      "group": null,
+      "content": "block+",
+      "marks": null,
+      "attrs": {
+        "colspan": {
+          "default": 1
+        },
+        "rowspan": {
+          "default": 1
+        },
+        "colwidth": {
+          "default": null
+        }
+      },
+      "defining": false
     }
   },
   "marks": {

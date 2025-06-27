@@ -1,124 +1,197 @@
 import json
+import re
+from dataclasses import dataclass
 from pathlib import Path
-
-# Load schema.json
-schema_path = Path("tiptap_schema_extractor/editor_schema.json")
-schema = json.loads(schema_path.read_text())
+from typing import List, Optional
 
 
-# Helper to convert ProseMirror content expressions to Python type hints
-def parse_content_expr(expr: str | None) -> str:
+# === AST NODES ===
+@dataclass
+class NodeExpr:
+    pass
+
+
+@dataclass
+class NamedNode(NodeExpr):
+    name: str
+    quantifier: Optional[str] = None
+
+
+@dataclass
+class Sequence(NodeExpr):
+    elements: List[NodeExpr]
+
+
+@dataclass
+class Alternation(NodeExpr):
+    options: List[NodeExpr]
+
+
+@dataclass
+class Group(NodeExpr):
+    expr: NodeExpr
+    quantifier: Optional[str] = None
+
+
+# === TOKENIZER ===
+TOKEN_RE = re.compile(r"\w+|[()*+?|]")
+
+
+def tokenize(expr: str) -> List[str]:
+    return TOKEN_RE.findall(expr)
+
+
+# === PARSER ===
+def parse_tokens(tokens: List[str]) -> NodeExpr:
+    def parse_expr(index):
+        seq = []
+        while index < len(tokens):
+            token = tokens[index]
+            if token == ")":
+                break
+            elif token == "(":
+                inner, index = parse_expr(index + 1)
+                if index < len(tokens) and tokens[index] in "*+?":
+                    inner = Group(expr=inner, quantifier=tokens[index])
+                    index += 1
+                seq.append(inner)
+            elif token == "|":
+                left = Sequence(seq) if len(seq) > 1 else seq[0]
+                right, index = parse_expr(index + 1)
+                return Alternation([left, right]), index
+            else:
+                quantifier = None
+                if index + 1 < len(tokens) and tokens[index + 1] in "*+?":
+                    quantifier = tokens[index + 1]
+                    index += 1
+                seq.append(NamedNode(name=token, quantifier=quantifier))
+            index += 1
+        return Sequence(seq) if len(seq) > 1 else seq[0], index + 1
+
+    ast, _ = parse_expr(0)
+    return ast
+
+
+# === PYTHON TYPE TRANSLATION ===
+def to_python_type(node: NodeExpr, group_map: dict) -> str:
+    if isinstance(node, NamedNode):
+        base_type = f"'{node.name.title()}Node'"
+        if node.quantifier == "+":
+            return f"List[{base_type}]"
+        elif node.quantifier == "*":
+            return f"Optional[List[{base_type}]]"
+        elif node.quantifier == "?":
+            return f"Optional[{base_type}]"
+        else:
+            return base_type
+    elif isinstance(node, Group):
+        inner = to_python_type(node.expr, group_map)
+        if node.quantifier == "+":
+            return f"List[{inner}]"
+        elif node.quantifier == "*":
+            return f"Optional[List[{inner}]]"
+        elif node.quantifier == "?":
+            return f"Optional[{inner}]"
+        else:
+            return inner
+    elif isinstance(node, Sequence):
+        types = [to_python_type(e, group_map) for e in node.elements]
+        return f"Tuple[{', '.join(types)}]" if len(types) > 1 else types[0]
+    elif isinstance(node, Alternation):
+        return f"Union[{', '.join(to_python_type(opt, group_map) for opt in node.options)}]"
+    else:
+        raise TypeError(f"Unsupported node type: {node}")
+
+
+# === MAIN ENTRY ===
+def parse_content_expr(expr: str | None, group_map: dict) -> str | None:
     if not expr:
         return None
-
-    parts = expr.split()
-    types = []
-
-    for part in parts:
-        if part.endswith("+"):
-            base = part[:-1]
-            types.append(f"List['{base.title()}Node']")
-        elif part.endswith("*"):
-            base = part[:-1]
-            types.append(f"Optional[List['{base.title()}Node']]")
-        else:
-            types.append(f"'{part.title()}Node'")
-
-    return f"Union[{', '.join(types)}]" if len(types) > 1 else types[0]
+    tokens = tokenize(expr)
+    ast = parse_tokens(tokens)
+    return to_python_type(ast, group_map)
 
 
-# Collect nodes by group for union types
-group_map = {"inline": [], "block": [], "list": []}
-
-for name, spec in schema.get("nodes", {}).items():
-    groups = spec.get("group", "")
-    if groups:
-        for g in groups.split():
-            if g in group_map:
-                node_name = name.title() + "Node"
-                group_map[g].append(f"'{node_name}'")
-
-
-# Helper to generate union type declarations
-def gen_union_type(name: str, types: list[str]) -> str:
-    if not types:
-        return f"{name} = None"
-    return f"{name} = Union[{', '.join(types)}]"
-
-
-# Generate Pydantic class for a node or mark
-def gen_node_class(name: str, node_spec: dict, kind: str = "Node") -> str:
-    class_name = name.title().replace("_", "") + kind
-    type_field = f'type: Literal["{name}"] = "{name}"'
-    attrs = node_spec.get("attrs", {})
-
-    if name == "text":
-        # special case for text node: has required 'text' field, no attrs, no content
-        return """
-class TextNode(TiptapNode):
-    type: Literal["text"] = "text"
-    text: str
-    """
-
-    if attrs:
-        attr_fields = []
-        for attr_name, attr_spec in attrs.items():
-            default = attr_spec.get("default", None)
-            py_type = type(default).__name__ if default is not None else "Any"
-            # Optional if default is None
-            if default is None:
-                attr_fields.append(f"    {attr_name}: Optional[{py_type}] = None")
-            else:
-                attr_fields.append(f"    {attr_name}: {py_type} = {repr(default)}")
-
-        attrs_model = f"\nclass {class_name}Attrs(BaseModel):\n" + (
-            "\n".join(attr_fields) if attr_fields else "    pass"
-        )
-        attrs_field = f"attrs: {class_name}Attrs = {class_name}Attrs()"
+# === CODE GENERATOR ===
+def python_type_from_default(value):
+    if isinstance(value, int):
+        return "int"
+    elif isinstance(value, str):
+        return "str"
+    elif value is None:
+        return "Optional[str]"
     else:
-        attrs_model = ""
-        attrs_field = None
-
-    content_type = parse_content_expr(node_spec.get("content"))
-    content_field = f"content: {content_type}" if content_type else None
-
-    class_content = "\n".join(
-        [f"    {line}" for line in [type_field, attrs_field, content_field] if line]
-    )
-
-    return f"""{attrs_model}
-
-    
-class {class_name}(TiptapNode):
-{class_content}
-"""
+        return "Optional[Any]"  # fallback, could be improved
 
 
-# Generate output Python code
-output = [
-    "# DO NOT EDIT. This file was automatically generated by generate_prose_mirror_classes.py.",
-    "from pydantic import BaseModel\nfrom typing import List, Optional, Union, Literal, Any\n",
-]
+def generate_node_types(schema_json: dict) -> str:
+    nodes = schema_json["nodes"]
+    group_map: dict[str, List[str]] = {}
+    for node_name, spec in nodes.items():
+        print(f"Generating {node_name}")
+        groups = spec.get("group", None)
+        if groups:
+            for group in groups.split():
+                if group:
+                    group_map.setdefault(group, []).append(node_name)
 
-output.append("""
-# Common parent class for all Tiptap nodes
-class TiptapNode(BaseModel):
-    # Base class for all Tiptap/ProseMirror nodes
-    pass
-""")
+    # Generate base and group types
+    lines = [
+        "# DO NOT EDIT. This file was automatically generated by generate_prose_mirror_classes.py.",
+        "from typing import List, Optional, Union, Tuple",
+        "from pydantic import BaseModel",
+        "from typing_extensions import Literal",
+        "",
+    ]
+    lines.append("# Common parent class for all Tiptap nodes")
+    lines.append("class TiptapNode(BaseModel):\n    pass\n")
 
-# Generate group unions
-output.append("# Node group unions for convenience\n")
-output.append(gen_union_type("InlineNode", group_map["inline"]))
-output.append(gen_union_type("BlockNode", group_map["block"]))
-output.append(gen_union_type("ListNode", group_map["list"]))
-output.append("")
+    for group, names in group_map.items():
+        lines.append(
+            f"{group.title()}Node = Union["
+            + ", ".join(f"'{n.title()}Node'" for n in sorted(names))
+            + "]"
+        )
+    lines.append("")
 
-for name, spec in schema.get("nodes", {}).items():
-    output.append(gen_node_class(name, spec, kind="Node"))
+    # Generate node classes
+    for node_name, spec in nodes.items():
+        typename = f"{node_name.title()}Node"
+        content_expr = spec.get("content")
+        content_type = parse_content_expr(content_expr, group_map)
 
-# Write to file
-output_path = Path("tiptap_models.py")
-output_path.write_text("\n".join(output))
+        lines.append(f"class {typename}(TiptapNode):")
+        lines.append(f'    type: Literal["{node_name}"] = "{node_name}"')
+        if content_type:
+            lines.append(f"    content: {content_type}")
 
-print("✅ Generated tiptap_models.py with group unions and conditional attrs classes.")
+        attrs = spec.get("attrs", {})
+        if attrs:
+            lines.append("")
+            lines.append("    class Attrs(BaseModel):")
+            for attr_name, attr_info in attrs.items():
+                default_val = attr_info.get("default")
+                py_type = python_type_from_default(default_val)
+                if default_val is None:
+                    lines.append(f"        {attr_name}: Optional[{py_type}] = None")
+                else:
+                    repr_val = repr(default_val)
+                    lines.append(
+                        f"        {attr_name}: Optional[{py_type}] = {repr_val}"
+                    )
+            lines.append("")
+            lines.append("    attrs: Optional[Attrs] = None")
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+# === USAGE EXAMPLE ===
+if __name__ == "__main__":
+    schema_path = Path("tiptap_schema_extractor/editor_schema.json")
+    schema = json.loads(schema_path.read_text())
+    output = generate_node_types(schema)
+    with open("tiptap_models.py", "w") as f:
+        f.write(output)
+    print("✅ Type definitions written to tiptap_models.py")
