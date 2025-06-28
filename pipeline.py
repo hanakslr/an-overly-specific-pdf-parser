@@ -1,5 +1,5 @@
 import sys
-from typing import Optional
+from typing import Optional, Type
 
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
@@ -11,9 +11,9 @@ from etl.llama_parse import LlamaParseOutput, parse
 from etl.pymupdf_parse import PyMuPDFOutput, extract
 from etl.zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
-from rule_registry.conversion_rules import ConversionRuleRegistry
+from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
-from tiptap.tiptap_models import DocNode
+from tiptap.tiptap_models import BaseAttrs, DocNode, TiptapNode
 
 
 class PipelineState(BaseModel):
@@ -203,7 +203,9 @@ def emit_block(state: PipelineState):
     """
     print(f"✏️  Emiting node using {state.current_block.conversion_rule}")
     # Get the conversion rule by ID
-    rule_class = ConversionRuleRegistry._rules.get(state.current_block.conversion_rule)
+    rule_class: Type[ConversionRule] = ConversionRuleRegistry._rules.get(
+        state.current_block.conversion_rule
+    )
     if not rule_class:
         raise ValueError(
             f"Conversion rule '{state.current_block.conversion_rule}' not found"
@@ -218,9 +220,19 @@ def emit_block(state: PipelineState):
     )
 
     # Construct the node using the rule
-    constructed_node = rule.construct_node(
+    constructed_node: TiptapNode = rule.construct_node(
         state.current_block.llama_item, pymupdf_input
     )
+
+    if constructed_node:
+        if not constructed_node.attrs:
+            # If attrs is None, we need to find the correct Attrs class to instantiate.
+            # It could be BaseAttrs or a node-specific subclass.
+            # The type hint for the attrs field on the node class will tell us.
+            constructed_node.attrs = BaseAttrs()
+
+        # Now we can safely set the unified_block_id
+        constructed_node.attrs.unified_block_id = state.current_block.id
 
     # Add the constructed node to the prose mirror document content
     updated_content = state.prose_mirror_doc.content + [constructed_node]
@@ -311,7 +323,7 @@ if __name__ == "__main__":
     try:
         for state_snapshot in graph.stream(
             initial_state,
-            config={"memory": memory, "recursion_limit": 100},
+            config={"memory": memory, "recursion_limit": 200},
             stream_mode="debug",
         ):
             payload = state_snapshot.get("payload", None)

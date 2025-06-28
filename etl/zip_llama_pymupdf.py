@@ -1,3 +1,4 @@
+import uuid
 from difflib import SequenceMatcher
 from typing import Optional
 
@@ -12,6 +13,8 @@ class UnifiedBlock(BaseModel):
     llama_item: PageItem
     fitz_items: Optional[list[Item]]
     conversion_rule: Optional[str] = None
+
+    id: str  # UUID
 
 
 class ZippedOutputsPage(BaseModel):
@@ -101,12 +104,20 @@ def match_blocks(
         if fitz_matches:
             unified.append(
                 UnifiedBlock(
-                    match_method="text", llama_item=llama_item, fitz_items=fitz_matches
+                    match_method="text",
+                    llama_item=llama_item,
+                    fitz_items=fitz_matches,
+                    id=str(uuid.uuid4()),
                 )
             )
         else:
             unified.append(
-                UnifiedBlock(match_method="none", llama_item=llama_item, fitz_items=[])
+                UnifiedBlock(
+                    match_method="none",
+                    llama_item=llama_item,
+                    fitz_items=[],
+                    id=str(uuid.uuid4()),
+                )
             )
 
     return unified

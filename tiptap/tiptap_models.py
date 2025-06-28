@@ -10,6 +10,11 @@ class TiptapNode(BaseModel):
     pass
 
 
+# Base class for attributes, includes unified_block_id
+class BaseAttrs(BaseModel):
+    unified_block_id: Optional[str] = None
+
+
 BlockNode = Union[
     "BlockquoteNode",
     "BulletlistNode",
@@ -28,24 +33,27 @@ InlineNode = Union["HardbreakNode", "TextNode"]
 class ParagraphNode(TiptapNode):
     type: Literal["paragraph"] = "paragraph"
     content: Optional[List["InlineNode"]]
+    attrs: Optional[BaseAttrs] = None
 
 
 class BlockquoteNode(TiptapNode):
     type: Literal["blockquote"] = "blockquote"
     content: List["BlockNode"]
+    attrs: Optional[BaseAttrs] = None
 
 
 class BulletlistNode(TiptapNode):
     type: Literal["bulletList"] = "bulletList"
     content: List["ListitemNode"]
+    attrs: Optional[BaseAttrs] = None
 
 
 class CodeblockNode(TiptapNode):
     type: Literal["codeBlock"] = "codeBlock"
     content: Optional[List["TextNode"]]
 
-    class Attrs(BaseModel):
-        language: Optional[Optional[str]] = None
+    class Attrs(BaseAttrs):
+        language: Optional[str] = None
 
     attrs: Optional[Attrs] = None
 
@@ -53,17 +61,19 @@ class CodeblockNode(TiptapNode):
 class DocNode(TiptapNode):
     type: Literal["doc"] = "doc"
     content: List["BlockNode"]
+    attrs: Optional[BaseAttrs] = None
 
 
 class HardbreakNode(TiptapNode):
     type: Literal["hardBreak"] = "hardBreak"
+    attrs: Optional[BaseAttrs] = None
 
 
 class HeadingNode(TiptapNode):
     type: Literal["heading"] = "heading"
     content: Optional[List["InlineNode"]]
 
-    class Attrs(BaseModel):
+    class Attrs(BaseAttrs):
         level: Optional[int] = 1
 
     attrs: Optional[Attrs] = None
@@ -71,20 +81,22 @@ class HeadingNode(TiptapNode):
 
 class HorizontalruleNode(TiptapNode):
     type: Literal["horizontalRule"] = "horizontalRule"
+    attrs: Optional[BaseAttrs] = None
 
 
 class ListitemNode(TiptapNode):
     type: Literal["listItem"] = "listItem"
     content: Tuple["ParagraphNode", Optional[List["BlockNode"]]]
+    attrs: Optional[BaseAttrs] = None
 
 
 class OrderedlistNode(TiptapNode):
     type: Literal["orderedList"] = "orderedList"
     content: List["ListitemNode"]
 
-    class Attrs(BaseModel):
+    class Attrs(BaseAttrs):
         start: Optional[int] = 1
-        type: Optional[Optional[str]] = None
+        type: Optional[str] = None
 
     attrs: Optional[Attrs] = None
 
@@ -92,15 +104,16 @@ class OrderedlistNode(TiptapNode):
 class TextNode(TiptapNode):
     type: Literal["text"] = "text"
     text: str
+    attrs: Optional[BaseAttrs] = None
 
 
 class ImageNode(TiptapNode):
     type: Literal["image"] = "image"
 
-    class Attrs(BaseModel):
-        src: Optional[Optional[str]] = None
-        alt: Optional[Optional[str]] = None
-        title: Optional[Optional[str]] = None
+    class Attrs(BaseAttrs):
+        src: Optional[str] = None
+        alt: Optional[str] = None
+        title: Optional[str] = None
 
     attrs: Optional[Attrs] = None
 
@@ -108,21 +121,23 @@ class ImageNode(TiptapNode):
 class TableNode(TiptapNode):
     type: Literal["table"] = "table"
     content: List["TablerowNode"]
+    attrs: Optional[BaseAttrs] = None
 
 
 class TablerowNode(TiptapNode):
     type: Literal["tableRow"] = "tableRow"
     content: Optional[List[Union["TablecellNode", "TableheaderNode"]]]
+    attrs: Optional[BaseAttrs] = None
 
 
 class TablecellNode(TiptapNode):
     type: Literal["tableCell"] = "tableCell"
     content: List["BlockNode"]
 
-    class Attrs(BaseModel):
+    class Attrs(BaseAttrs):
         colspan: Optional[int] = 1
         rowspan: Optional[int] = 1
-        colwidth: Optional[Optional[str]] = None
+        colwidth: Optional[str] = None
 
     attrs: Optional[Attrs] = None
 
@@ -131,9 +146,9 @@ class TableheaderNode(TiptapNode):
     type: Literal["tableHeader"] = "tableHeader"
     content: List["BlockNode"]
 
-    class Attrs(BaseModel):
+    class Attrs(BaseAttrs):
         colspan: Optional[int] = 1
         rowspan: Optional[int] = 1
-        colwidth: Optional[Optional[str]] = None
+        colwidth: Optional[str] = None
 
     attrs: Optional[Attrs] = None
