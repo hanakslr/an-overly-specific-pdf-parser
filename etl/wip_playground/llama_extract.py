@@ -26,6 +26,23 @@ goals_schema = {
     "type": "object",
     "$schema": "http://json-schema.org/draft-04/schema#",
     "properties": {
+        "image_header": {
+            "type": "array",
+            "description": "Image source info for the image header at the beginning of the chapter. Should be 3 images.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "How it would be referred in a standard llamaparse job, Example: img_p0_1.png",
+                    },
+                    "index": {
+                        "type": "number",
+                        "description": "Postion in header row",
+                    },
+                },
+            },
+        },
         "goals": {
             "type": "object",
             "description": "A blue table with a dark blue border that has a header of Goals: In 2050 Williston is...",
@@ -78,6 +95,92 @@ goals_schema = {
                 },
             },
         },
+        "objectives_strategies_actions_table": {
+            "type": "object",
+            "description": "A yellow table near the end of the chapter with header Objectives, Strategies, and Actions. Spans multiple pages.",
+            "properties": {
+                "objectives": {
+                    "description": "Ordered lists of elements under the Objectives subtitle",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "description": "Ex: 1.4, 1.B, etc",
+                            },
+                            "text": {
+                                "type": "string",
+                                "description": "Corresponding content of the objective",
+                            },
+                        },
+                    },
+                },
+                "strategies": {
+                    "description": "Ordered list of elements under the Strategies subtitle. Can span multiple pages. Each strategy can have actions associated with it.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "description": "Ex: 1.1, 1.2, etc",
+                            },
+                            "text": {
+                                "type": "string",
+                                "description": "Corresponding conetnt of the strategy",
+                            },
+                        },
+                    },
+                },
+                "actions": {
+                    "type": "array",
+                    "description": "Ordered list of actions underneath a strategy",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "strategy": {
+                                "type": "string",
+                                "description": "The label of the strategy this action corresponds to. Ex: 1.1, 1.2",
+                            },
+                            "label": {
+                                "type": "string",
+                                "description": "Ex: 1.1.1, 1.1.2, etc",
+                            },
+                            "text": {
+                                "type": "string",
+                                "description": "Corresponding description of the action",
+                            },
+                            "responsibility": {
+                                "type": "string",
+                                "description": "Department responsible. The column next to text",
+                            },
+                            "timeframe": {
+                                "type": "string",
+                            },
+                            "cost": {
+                                "type": "string",
+                                "description": "An indicator in $ signs.",
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "citations": {
+            "type": "array",
+            "description": "A list of cited sources referenced by number throughout the text. Occurs at the very end of the document after End Notes.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "Superscript indicator, typically a number, of the citation label",
+                    },
+                    "source": {"type": "string", "description": "Citation information"},
+                },
+            },
+        },
     },
 }
 
@@ -85,8 +188,8 @@ goals_schema = {
 def extract(pdf_path: str):
     extractor = LlamaExtract(api_key=os.getenv("LLAMA_PARSE_API_KEY"))
 
-    # agent = extractor.create_agent("townplan_table_parser", data_schema=goals_schema)
-    agent = extractor.get_agent(name="townplan_table_parser")
+    agent = extractor.create_agent("townplan_table_parser_3", data_schema=goals_schema)
+    agent = extractor.get_agent(name="townplan_table_parser_3")
     result = agent.extract(pdf_path)
     return result
 
@@ -99,5 +202,5 @@ if __name__ == "__main__":
         result = extract(pdf_path)
 
         # Save to JSON using Pydantic serialization
-        with open("output/llamaparse/llama_extract.json", "w", encoding="utf-8") as f:
-            json.dump(result.json(), f, indent=2, ensure_ascii=False)
+        with open("output/llamaparse/llama_extract.json", "w") as f:
+            json.dump(result.json(), f, indent=2)

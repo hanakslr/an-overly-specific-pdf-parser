@@ -82,6 +82,6 @@ def draw_pipeline(graph: CompiledStateGraph):
         png_path = "pipeline_diagram.png"
         with open(png_path, "wb") as f:
             f.write(png_bytes)
-        print(f"📊 Pipeline diagram saved to: {png_path}")
+        print(f"📊 Pipeline diagram saved to: {png_path}\n")
     except Exception as e:
         print(f"⚠️ Could not generate pipeline diagram: {e}")
