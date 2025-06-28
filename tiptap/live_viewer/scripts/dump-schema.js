@@ -6,16 +6,12 @@ global.Node = window.Node;
 global.DOMParser = window.DOMParser;
 
 import { Editor } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import Image from '@tiptap/extension-image'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
+import { extensions } from "../src/extensions.js";
 import fs from "fs";
+import path from "path";
 
 const editor = new Editor({
-  extensions: [StarterKit, Image, Table, TableRow, TableCell, TableHeader],
+  extensions: extensions,
 });
 
 function pairsFromFlat(array) {
@@ -27,9 +23,7 @@ function pairsFromFlat(array) {
 }
 
 function dumpSpecMap(map) {
-  console.log(map.content);
   const items = pairsFromFlat(map.content);
-  console.log(items)
   return Object.fromEntries(
     items.map(([name, item]) => [
       name,
@@ -49,4 +43,7 @@ const schemaJSON = {
   marks: dumpSpecMap(editor.schema.spec.marks),
 };
 
-fs.writeFileSync("../editor_schema.json", JSON.stringify(schemaJSON, null, 2));
+const outputPath = path.resolve(process.cwd(), '../editor_schema.json');
+fs.writeFileSync(outputPath, JSON.stringify(schemaJSON, null, 2));
+
+console.log(`✅ Schema written to ${outputPath}`); 

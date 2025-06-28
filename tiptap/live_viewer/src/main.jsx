@@ -1,16 +1,11 @@
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
+import { extensions } from './extensions';
 
 const Editor = () => {
   const editor = useEditor({
-    extensions: [StarterKit, Image, Table, TableRow, TableCell, TableHeader],
+    extensions: extensions,
     content: '',
   })
 
