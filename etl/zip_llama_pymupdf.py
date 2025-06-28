@@ -4,13 +4,13 @@ from typing import Optional
 from llama_cloud_services.parse.types import Page, PageItem
 from pydantic import BaseModel
 
-from etl.pymupdf_parse import PageResult, PyMuPdfItem, TextItem
+from etl.pymupdf_parse import Item, PageResult, PyMuPdfItem, TextItem
 
 
 class UnifiedBlock(BaseModel):
     match_method: str
     llama_item: PageItem
-    fitz_items: list[PyMuPdfItem]
+    fitz_items: Optional[list[Item]]
     conversion_rule: Optional[str] = None
 
 

@@ -120,6 +120,11 @@ def get_next_block(state: PipelineState):
     Get the next block to process. If no more blocks, return None to end the pipeline.
     """
     print(f"\n\n➡️  Getting next block after {state.page_index=} {state.block_index=}")
+
+    # Did we already finish?
+    if state.block_index is None and state.page_index is None:
+        return {}
+
     # Check if we have more blocks to process on our current page
     if state.block_index < len(state.zipped_pages[state.page_index].unified_blocks) - 1:
         return {
