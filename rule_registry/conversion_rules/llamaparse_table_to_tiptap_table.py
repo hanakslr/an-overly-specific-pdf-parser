@@ -25,7 +25,9 @@ class LlamaparseTableToTiptapTableConversion(ConversionRule):
         rows = []
         for row in llamaparse_input.rows:
             cells = [
-                TablecellNode(content=[ParagraphNode(content=[TextNode(text=cell)])])
+                TablecellNode(
+                    content=[ParagraphNode(content=[TextNode(text=cell or " ")])]
+                )
                 for cell in row
             ]
             rows.append(TablerowNode(content=cells))
