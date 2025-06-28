@@ -17,6 +17,6 @@ class HeadingConversion(ConversionRule):
         cls, llamaparse_input: PageItem, pymupdf_inputs: list[Item]
     ) -> HeadingNode:
         return HeadingNode(
-            attrs={"level": llamaparse_input.lvl},
+            attrs=HeadingNode.Attrs(level=llamaparse_input.lvl),
             content=[TextNode(text=llamaparse_input.value)],
         )

@@ -165,6 +165,10 @@ def generate_node_types(schema_json: dict) -> str:
         if content_type:
             lines.append(f"    content: {content_type}")
 
+        # This is a special case.
+        if node_name == "text":
+            lines.append("    text: str")
+
         attrs = spec.get("attrs", {})
         if attrs:
             lines.append("")
@@ -189,7 +193,7 @@ def generate_node_types(schema_json: dict) -> str:
 
 # === USAGE EXAMPLE ===
 if __name__ == "__main__":
-    schema_path = Path("tiptap_schema_extractor/editor_schema.json")
+    schema_path = Path("tiptap/schema_extractor/editor_schema.json")
     schema = json.loads(schema_path.read_text())
     output = generate_node_types(schema)
     with open("tiptap_models.py", "w") as f:

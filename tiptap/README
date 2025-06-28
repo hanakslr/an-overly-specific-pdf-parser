@@ -14,3 +14,5 @@ Then run `uv run chema_extractor/generate_prose_mirror_classes.py` and this will
 ## TODO
 
 Consolidate the live viewer and the schema extractor so that extensions don't need to be managed in two places.
+
+to run the live view: `pnpm install && pnpm run dev`

@@ -1,3 +1,7 @@
+"""
+To run: `uv run uvicorn main:app --reload`
+"""
+
 from typing import Any
 
 from fastapi import FastAPI
