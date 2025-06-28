@@ -34,7 +34,7 @@ class Group(NodeExpr):
 
 
 # === TOKENIZER ===
-TOKEN_RE = re.compile(r"\\w+|[()*+?|]")
+TOKEN_RE = re.compile(r"\w+|[()*+?|]")
 
 
 def tokenize(expr: str) -> List[str]:

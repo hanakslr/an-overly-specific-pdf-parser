@@ -22,6 +22,7 @@ BlockNode = Union[
     "HeadingNode",
     "HorizontalruleNode",
     "ImageNode",
+    "ImageheaderNode",
     "OrderedlistNode",
     "ParagraphNode",
     "TableNode",
@@ -152,3 +153,9 @@ class TableheaderNode(TiptapNode):
         colwidth: Optional[str] = None
 
     attrs: Optional[Attrs] = None
+
+
+class ImageheaderNode(TiptapNode):
+    type: Literal["imageHeader"] = "imageHeader"
+    content: Tuple["ImageNode", "ImageNode", "ImageNode"]
+    attrs: Optional[BaseAttrs] = None
