@@ -196,6 +196,6 @@ if __name__ == "__main__":
     schema_path = Path("tiptap/schema_extractor/editor_schema.json")
     schema = json.loads(schema_path.read_text())
     output = generate_node_types(schema)
-    with open("tiptap_models.py", "w") as f:
+    with open("tiptap/tiptap_models.py", "w") as f:
         f.write(output)
     print("✅ Type definitions written to tiptap_models.py")

@@ -91,6 +91,7 @@ class OrderedlistNode(TiptapNode):
 
 class TextNode(TiptapNode):
     type: Literal["text"] = "text"
+    text: str
 
 
 class ImageNode(TiptapNode):

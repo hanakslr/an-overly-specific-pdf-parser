@@ -229,6 +229,7 @@ def emit_block(state: PipelineState):
 
 def update_live_editor(state: PipelineState):
     if state.prose_mirror_doc:
+        print("👀  Updating live editor")
         update_document(state.prose_mirror_doc)
 
 
@@ -263,7 +264,6 @@ def build_pipeline():
         {"RuleForBlock": "RuleForBlock", "END": END},
     )
 
-    builder.add_edge("GetNextBlock", "RuleForBlock")
     builder.add_conditional_edges(
         "RuleForBlock",
         should_emit_block,
