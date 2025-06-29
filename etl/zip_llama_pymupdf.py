@@ -1,17 +1,20 @@
+import json
 import uuid
-from difflib import SequenceMatcher
 from typing import Optional
 
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
 from llama_cloud_services.parse.types import Page, PageItem
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from etl.pymupdf_parse import Item, PageResult, PyMuPdfItem, TextItem
+from etl.pymupdf_parse import PageResult, PyMuPdfItem
 
 
 class UnifiedBlock(BaseModel):
     match_method: str
     llama_item: PageItem
-    fitz_items: Optional[list[Item]]
+    fitz_items: Optional[list[PyMuPdfItem]]
     conversion_rule: Optional[str] = None
 
     id: str  # UUID
@@ -26,98 +29,104 @@ class ZippedOutputsPage(BaseModel):
     unified_blocks: list[UnifiedBlock] = None
 
 
-def fuzzy_match(a: str, b: str, threshold: float = 0.85) -> bool:
-    a_norm = a.lower().strip()
-    b_norm = b.lower().strip()
-    return SequenceMatcher(None, a_norm, b_norm).ratio() > threshold
+# For LLM-based matching
+class MatchedIds(BaseModel):
+    llama_id: int = Field(
+        description="The id of the LlamaParse item in the provided list."
+    )
+    pymupdf_ids: Optional[list[int]] = Field(
+        description="A list of ids for the matching PyMuPDF items from the provided list."
+    )
 
 
-def find_text_match(
-    llama_text: str, pymupdf_items: list[PyMuPdfItem], used_indices: set[int]
-) -> list[PyMuPdfItem]:
+class MatchingResult(BaseModel):
+    matches: list[MatchedIds] = Field(description="The list of all matches found.")
+
+
+def match_pages(llama_parse_page: Page, pymupdf_page: PageResult) -> list[UnifiedBlock]:
     """
-    Find the first sequence of PyMuPDF text items that match the llama text.
-    Returns the matching items and marks their indices as used.
+    Given the examples below, return a list of UnifiedBlocks by prefiltering the lists
+    of llamaparse items down to type= headings or text, and then
     """
-    if not llama_text:
-        return []
+    llama_items_to_match = [
+        {"id": index, "text": item.value}
+        for index, item in enumerate(llama_parse_page.items)
+        if item.type in ["heading", "text"]
+    ]
 
-    llama_text_norm = llama_text.lower().strip()
+    pymupdf_items_to_match = [
+        {"id": index, "text": item.text}
+        for index, item in enumerate(pymupdf_page.content)
+        if item.type == "text"
+    ]
 
-    # Try to find exact matches first
-    for i, item in enumerate(pymupdf_items):
-        if i in used_indices or not isinstance(item, TextItem):
-            continue
+    print(f"\n\n{llama_items_to_match=}\n{pymupdf_items_to_match=}")
 
-        # Check if this single item matches
-        if fuzzy_match(item.text, llama_text):
-            used_indices.add(i)
-            return [item]
+    my_llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    output_parser = PydanticOutputParser(pydantic_object=MatchingResult)
 
-        # Check if we can build a match by combining consecutive text items
-        combined_text = item.text
-        matched_items = [item]
-        current_indices = {i}
+    prompt_template = """
+You are an expert at matching text blocks from two different sources of a PDF document.
+One source is from LlamaParse, and the other is from PyMuPDF.
+Your task is to match each item from the LlamaParse output to one or more items from the PyMuPDF output.
 
-        # Try to combine with subsequent text items
-        for j in range(i + 1, len(pymupdf_items)):
-            if j in used_indices or not isinstance(pymupdf_items[j], TextItem):
-                break
+- The items are mostly in the same order in both lists.
+- Each PyMuPDF item can only be assigned to one LlamaParse item.
+- Some LlamaParse items might not have a corresponding PyMuPDF item. In this case, pymupdf_indexes should be null or an empty list.
+- You MUST assign every PyMuPDF item to a LlamaParse item.
+- For each LlamaParse item you were given, you must provide a corresponding match object in your response. The `llama_index` in your response should be the index of the item in the input list, NOT the original index contained in the item object.
 
-            # Add space between text items
-            combined_text += " " + pymupdf_items[j].text
+Here are the items from LlamaParse (with their original index):
+{llama_items}
 
-            if fuzzy_match(combined_text, llama_text):
-                # Found a match! Mark all items as used
-                used_indices.update(current_indices)
-                used_indices.add(j)
-                matched_items.append(pymupdf_items[j])
-                return matched_items
-            elif len(combined_text) > len(llama_text_norm) * 1.5:
-                # Stop if we've exceeded reasonable length
-                break
-            else:
-                # Continue building the combination
-                current_indices.add(j)
-                matched_items.append(pymupdf_items[j])
+Here are the items from PyMuPDF (with their original index):
+{pymupdf_items}
 
-    return []
+Based on the text content, please provide the matching pairs of indexes.
 
+{format_instructions}
+"""
+    prompt = PromptTemplate(
+        template=prompt_template,
+        input_variables=["llama_items", "pymupdf_items"],
+        partial_variables={
+            "format_instructions": output_parser.get_format_instructions()
+        },
+    )
 
-def match_blocks(
-    llama_parse_page: Page, pymupdf_page: PageResult
-) -> list[UnifiedBlock]:
-    """
-    Given the output of a llama parse and a pymupdf,
-    match up the individual items into a single list using text-based matching.
-    Items are processed in order and each PyMuPDF item is only used once.
-    """
-    unified = []
-    used_pymupdf_indices = set()
+    chain = prompt | my_llm | output_parser
 
-    for llama_item in llama_parse_page.items:
-        # Find matching PyMuPDF text items
-        fitz_matches = find_text_match(
-            llama_item.value, pymupdf_page.content, used_pymupdf_indices
+    result: MatchingResult = chain.invoke(
+        {
+            "llama_items": json.dumps(llama_items_to_match, indent=2),
+            "pymupdf_items": json.dumps(pymupdf_items_to_match, indent=2),
+        }
+    )
+
+    print(f"Got {result=}")
+
+    # Create a map from original llama_item index to list of pymupdf original indexes
+    llama_to_pymupdf_map = {}
+    for match in result.matches:
+        if match.pymupdf_ids:
+            llama_to_pymupdf_map[match.llama_id] = [i for i in match.pymupdf_ids]
+
+    unified_blocks = []
+    for i, llama_item in enumerate(llama_parse_page.items):
+        fitz_items = []
+        match_method = "none"
+        if i in llama_to_pymupdf_map:
+            match_method = "llm"
+            pymupdf_indices = llama_to_pymupdf_map[i]
+            fitz_items = [pymupdf_page.content[j] for j in pymupdf_indices]
+
+        unified_blocks.append(
+            UnifiedBlock(
+                match_method=match_method,
+                llama_item=llama_item,
+                fitz_items=fitz_items,
+                id=str(uuid.uuid4()),
+            )
         )
 
-        if fitz_matches:
-            unified.append(
-                UnifiedBlock(
-                    match_method="text",
-                    llama_item=llama_item,
-                    fitz_items=fitz_matches,
-                    id=str(uuid.uuid4()),
-                )
-            )
-        else:
-            unified.append(
-                UnifiedBlock(
-                    match_method="none",
-                    llama_item=llama_item,
-                    fitz_items=[],
-                    id=str(uuid.uuid4()),
-                )
-            )
-
-    return unified
+    return unified_blocks

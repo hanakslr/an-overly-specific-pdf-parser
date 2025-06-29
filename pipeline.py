@@ -9,7 +9,11 @@ from pydantic import BaseModel, computed_field
 from doc_server.helpers import update_document
 from etl.llama_parse import LlamaParseOutput, parse
 from etl.pymupdf_parse import PyMuPDFOutput, extract
-from etl.zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
+from etl.zip_llama_pymupdf import (
+    UnifiedBlock,
+    ZippedOutputsPage,
+    match_pages,
+)
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
 from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
@@ -91,6 +95,8 @@ def zip_outputs(state: PipelineState):
         print("⏭️  Zipping pages already completed, skipping...")
         return {}
 
+    print("🧹  Zipping pages")
+
     assert len(state.llama_parse_output.pages) == len(state.pymupdf_output.pages)
 
     pages = []
@@ -101,7 +107,7 @@ def zip_outputs(state: PipelineState):
             page=i + 1,
             llama_parse_page=lp_page,
             pymupdf_page=pm_page,
-            unified_blocks=match_blocks(lp_page, pm_page),
+            unified_blocks=match_pages(lp_page, pm_page),
         )
         pages.append(zipped_page)
 
