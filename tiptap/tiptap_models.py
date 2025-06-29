@@ -88,7 +88,7 @@ class HorizontalruleNode(TiptapNode):
 
 class ListitemNode(TiptapNode):
     type: Literal["listItem"] = "listItem"
-    content: Tuple[List["ParagraphNode"], Optional[List["BlockNode"]]]
+    content: Tuple["ParagraphNode", Optional[List["BlockNode"]]]
     attrs: Optional[BaseAttrs] = None
 
 
@@ -128,7 +128,7 @@ class TableNode(TiptapNode):
 
 class TablerowNode(TiptapNode):
     type: Literal["tableRow"] = "tableRow"
-    content: Optional[List[Union[List["TablecellNode"], List["TableheaderNode"]]]]
+    content: Optional[List[Union["TablecellNode", "TableheaderNode"]]]
     attrs: Optional[BaseAttrs] = None
 
 
@@ -158,13 +158,13 @@ class TableheaderNode(TiptapNode):
 
 class ImageheaderNode(TiptapNode):
     type: Literal["imageHeader"] = "imageHeader"
-    content: Tuple[List["ImageNode"], List["ImageNode"], List["ImageNode"]]
+    content: Tuple["ImageNode", "ImageNode", "ImageNode"]
     attrs: Optional[BaseAttrs] = None
 
 
 class ActionitemNode(TiptapNode):
     type: Literal["actionItem"] = "actionItem"
-    content: List["ParagraphNode"]
+    content: "ParagraphNode"
 
     class Attrs(BaseAttrs):
         strategy: Optional[str] = ""
