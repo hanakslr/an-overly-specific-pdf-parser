@@ -186,6 +186,17 @@
         }
       },
       "defining": false
+    },
+    "strategyItem": {
+      "group": "block",
+      "content": "paragraph actionItem*",
+      "marks": null,
+      "attrs": {
+        "label": {
+          "default": ""
+        }
+      },
+      "defining": false
     }
   },
   "marks": {
