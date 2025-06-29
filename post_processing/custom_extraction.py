@@ -9,6 +9,7 @@ from post_processing.williston_extraction_schema import ExtractedData
 from tiptap.tiptap_models import (
     BlockNode,
     DocNode,
+    HeadingNode,
     ImageheaderNode,
     ImageNode,
     TiptapNode,
@@ -43,7 +44,9 @@ def convert_to_prosemirror(state: CustomExtractionState):
 def create_image_header(state: CustomExtractionState) -> DocNode:
     """
     Iterate through state.prose_mirror_doc.content and find 3 images in a row.
-    Serialize them back into ImageNode and replace them with an ImageheaderNode.
+    If the following element is a level 1 header, insert the ImageheaderNode after the header.
+    If there's a paragraph with "[Three photographs..." text after the heading, skip it.
+    Otherwise, replace the 3 images with an ImageheaderNode.
     """
     if not state.prose_mirror_doc or not state.prose_mirror_doc.content:
         return state.prose_mirror_doc
@@ -67,8 +70,39 @@ def create_image_header(state: CustomExtractionState) -> DocNode:
             image2 = content[i + 1]
             image3 = content[i + 2]
             image_header = ImageheaderNode(content=(image1, image2, image3))
-            new_content.append(image_header)
-            i += 3
+
+            # Check if the next element after the 3 images is a level 1 heading
+            if (
+                i + 3 < len(content)
+                and isinstance(content[i + 3], HeadingNode)
+                and content[i + 3].attrs
+                and content[i + 3].attrs.level == 1
+            ):
+                # Insert the heading first, then the image header
+                new_content.append(content[i + 3])
+
+                # Check if there's a paragraph with "[Three photographs..." text after the heading
+                if (
+                    i + 4 < len(content)
+                    and hasattr(content[i + 4], "type")
+                    and content[i + 4].type == "paragraph"
+                    and content[i + 4].content
+                    and len(content[i + 4].content) > 0
+                    and hasattr(content[i + 4].content[0], "text")
+                    and content[i + 4].content[0].text.startswith("[Three photographs")
+                    and content[i + 4].content[0].text.endswith("]")
+                ):
+                    # Skip the paragraph and insert image header
+                    new_content.append(image_header)
+                    i += 5  # Skip the 3 images, heading, and the paragraph
+                else:
+                    # No special paragraph, just insert image header
+                    new_content.append(image_header)
+                    i += 4  # Skip the 3 images and the heading
+            else:
+                # No level 1 heading follows, replace the 3 images with image header
+                new_content.append(image_header)
+                i += 3
         else:
             new_content.append(content[i])
             i += 1
