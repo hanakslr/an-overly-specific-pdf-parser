@@ -72,37 +72,8 @@ def create_image_header(state: CustomExtractionState) -> DocNode:
             image_header = ImageheaderNode(content=(image1, image2, image3))
 
             # Check if the next element after the 3 images is a level 1 heading
-            if (
-                i + 3 < len(content)
-                and isinstance(content[i + 3], HeadingNode)
-                and content[i + 3].attrs
-                and content[i + 3].attrs.level == 1
-            ):
-                # Insert the heading first, then the image header
-                new_content.append(content[i + 3])
-
-                # Check if there's a paragraph with "[Three photographs..." text after the heading
-                if (
-                    i + 4 < len(content)
-                    and hasattr(content[i + 4], "type")
-                    and content[i + 4].type == "paragraph"
-                    and content[i + 4].content
-                    and len(content[i + 4].content) > 0
-                    and hasattr(content[i + 4].content[0], "text")
-                    and content[i + 4].content[0].text.startswith("[Three photographs")
-                    and content[i + 4].content[0].text.endswith("]")
-                ):
-                    # Skip the paragraph and insert image header
-                    new_content.append(image_header)
-                    i += 5  # Skip the 3 images, heading, and the paragraph
-                else:
-                    # No special paragraph, just insert image header
-                    new_content.append(image_header)
-                    i += 4  # Skip the 3 images and the heading
-            else:
-                # No level 1 heading follows, replace the 3 images with image header
-                new_content.append(image_header)
-                i += 3
+            new_content.append(image_header)
+            i += 3
         else:
             new_content.append(content[i])
             i += 1

@@ -44,6 +44,9 @@ class PipelineState(BaseModel):
     @computed_field
     @property
     def current_block(self) -> Optional[UnifiedBlock]:
+        if not self.zipped_pages:
+            return None
+
         if self.page_index is None or self.block_index is None:
             return None
 
@@ -75,8 +78,7 @@ def llama_parse(state: PipelineState):
         return {}
 
     print("🔄 Running LlamaParse...")
-    result = parse(state.pdf_path)
-    llama_parse_output = LlamaParseOutput(result)
+    llama_parse_output = parse(state.pdf_path)
     return {"llama_parse_output": llama_parse_output}
 
 

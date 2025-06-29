@@ -75,7 +75,7 @@ def insert_images(state):
             if node.attrs and node.attrs.unified_block_id:
                 block = block_id_to_block.get(node.attrs.unified_block_id)
                 if block and block.fitz_items:
-                    node_y0 = block.fitz_items[0].bbox[1]
+                    node_y0 = block.fitz_items[-1].bbox[1]
 
             if image_y0 < node_y0:
                 insertion_index = i
