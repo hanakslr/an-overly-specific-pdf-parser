@@ -103,8 +103,6 @@ Based on the text content, please provide the matching pairs of indexes.
         }
     )
 
-    print(f"Got {result=}")
-
     # Create a map from original llama_item index to list of pymupdf original indexes
     llama_to_pymupdf_map = {}
     for match in result.matches:
