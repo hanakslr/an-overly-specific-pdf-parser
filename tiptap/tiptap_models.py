@@ -16,6 +16,7 @@ class BaseAttrs(BaseModel):
 
 
 BlockNode = Union[
+    "ActionitemNode",
     "BlockquoteNode",
     "BulletlistNode",
     "CodeblockNode",
@@ -87,7 +88,7 @@ class HorizontalruleNode(TiptapNode):
 
 class ListitemNode(TiptapNode):
     type: Literal["listItem"] = "listItem"
-    content: Tuple["ParagraphNode", Optional[List["BlockNode"]]]
+    content: Tuple[List["ParagraphNode"], Optional[List["BlockNode"]]]
     attrs: Optional[BaseAttrs] = None
 
 
@@ -127,7 +128,7 @@ class TableNode(TiptapNode):
 
 class TablerowNode(TiptapNode):
     type: Literal["tableRow"] = "tableRow"
-    content: Optional[List[Union["TablecellNode", "TableheaderNode"]]]
+    content: Optional[List[Union[List["TablecellNode"], List["TableheaderNode"]]]]
     attrs: Optional[BaseAttrs] = None
 
 
@@ -157,5 +158,19 @@ class TableheaderNode(TiptapNode):
 
 class ImageheaderNode(TiptapNode):
     type: Literal["imageHeader"] = "imageHeader"
-    content: Tuple["ImageNode", "ImageNode", "ImageNode"]
+    content: Tuple[List["ImageNode"], List["ImageNode"], List["ImageNode"]]
     attrs: Optional[BaseAttrs] = None
+
+
+class ActionitemNode(TiptapNode):
+    type: Literal["actionItem"] = "actionItem"
+    content: List["ParagraphNode"]
+
+    class Attrs(BaseAttrs):
+        strategy: Optional[str] = ""
+        label: Optional[str] = ""
+        responsibility: Optional[str] = ""
+        timeframe: Optional[str] = ""
+        cost: Optional[str] = ""
+
+    attrs: Optional[Attrs] = None

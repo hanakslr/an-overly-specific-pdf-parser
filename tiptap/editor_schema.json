@@ -163,6 +163,29 @@
       "marks": null,
       "attrs": {},
       "defining": false
+    },
+    "actionItem": {
+      "group": "block",
+      "content": "paragraph",
+      "marks": null,
+      "attrs": {
+        "strategy": {
+          "default": ""
+        },
+        "label": {
+          "default": ""
+        },
+        "responsibility": {
+          "default": ""
+        },
+        "timeframe": {
+          "default": ""
+        },
+        "cost": {
+          "default": ""
+        }
+      },
+      "defining": false
     }
   },
   "marks": {

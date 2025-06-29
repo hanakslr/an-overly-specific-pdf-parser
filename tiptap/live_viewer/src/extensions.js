@@ -5,6 +5,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import { ImageHeader } from "./custom_extensions/image_header.js";
+import {ActionItem} from "./custom_extensions/actionItem/extension.js"
 
 export const extensions = [
     StarterKit,
@@ -13,5 +14,6 @@ export const extensions = [
     TableRow,
     TableCell,
     TableHeader,
-    ImageHeader
+    ImageHeader,
+    ActionItem
 ]; 
