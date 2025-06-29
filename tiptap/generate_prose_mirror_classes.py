@@ -109,7 +109,22 @@ def parse_content_expr(expr: str | None, group_map: dict) -> str | None:
         return None
     tokens = tokenize(expr)
     ast = parse_tokens(tokens)
-    return to_python_type(ast, group_map)
+    base_type = to_python_type(ast, group_map)
+
+    # In ProseMirror, content is always an array. Use Tuple for fixed-length sequences:
+    if isinstance(ast, NamedNode) and not ast.quantifier:
+        # Single node with no quantifier -> single-item Tuple
+        return f"Tuple[{base_type}]"
+    elif isinstance(ast, Sequence):
+        # Check if all elements are NamedNodes with no quantifiers (fixed sequence)
+        all_fixed = all(
+            isinstance(elem, NamedNode) and not elem.quantifier for elem in ast.elements
+        )
+        if all_fixed:
+            # Fixed sequence -> keep as Tuple (this handles cases like "image image image")
+            return base_type
+
+    return base_type
 
 
 # === CODE GENERATOR ===

@@ -164,7 +164,7 @@ class ImageheaderNode(TiptapNode):
 
 class ActionitemNode(TiptapNode):
     type: Literal["actionItem"] = "actionItem"
-    content: "ParagraphNode"
+    content: Tuple["ParagraphNode"]
 
     class Attrs(BaseAttrs):
         strategy: Optional[str] = ""
