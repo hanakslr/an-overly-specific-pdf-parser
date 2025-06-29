@@ -16,7 +16,6 @@ class BaseAttrs(BaseModel):
 
 
 BlockNode = Union[
-    "ActionitemNode",
     "BlockquoteNode",
     "BulletlistNode",
     "CodeblockNode",
@@ -26,7 +25,6 @@ BlockNode = Union[
     "ImageheaderNode",
     "OrderedlistNode",
     "ParagraphNode",
-    "StrategyitemNode",
     "TableNode",
 ]
 ListNode = Union["BulletlistNode", "OrderedlistNode"]
@@ -173,38 +171,3 @@ class ImageheaderNode(TiptapNode):
     type: Literal["imageHeader"] = "imageHeader"
     content: Tuple["ImageNode", "ImageNode", "ImageNode"]
     attrs: Optional[BaseAttrs] = None
-
-
-class ActionitemNode(TiptapNode):
-    type: Literal["actionItem"] = "actionItem"
-    content: Tuple["ParagraphNode"]
-
-    class Attrs(BaseAttrs):
-        strategy: Optional[str] = ""
-        label: Optional[str] = ""
-        responsibility: Optional[str] = ""
-        timeframe: Optional[str] = ""
-        cost: Optional[str] = ""
-
-    attrs: Optional[Attrs] = None
-
-
-class StrategyitemNode(TiptapNode):
-    type: Literal["strategyItem"] = "strategyItem"
-    content: List[Union["ActionitemNode", "ParagraphNode"]]
-
-    @validator("content")
-    def check_content(cls, v):
-        if not v:
-            return v
-        if v[0].type != "paragraph":
-            raise ValueError("First child must be a paragraph")
-        for node in v[1:]:
-            if node.type != "actionItem":
-                raise ValueError("Subsequent children must be actionItems")
-        return v
-
-    class Attrs(BaseAttrs):
-        label: Optional[str] = ""
-
-    attrs: Optional[Attrs] = None
