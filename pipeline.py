@@ -67,9 +67,7 @@ def llama_parse(state: PipelineState):
 
     print("🔄 Running LlamaParse...")
     result = parse(state.pdf_path)
-    # Convert the list of dictionaries to LlamaParseOutput
-    # The parse function returns a list, but we expect a single LlamaParseOutput
-    llama_parse_output = LlamaParseOutput(**result[0])
+    llama_parse_output = LlamaParseOutput(result)
     return {"llama_parse_output": llama_parse_output}
 
 
