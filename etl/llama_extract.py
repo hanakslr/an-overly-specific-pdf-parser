@@ -22,14 +22,6 @@ class LlamaParseOutput(BaseModel):
     file_path: str
 
 
-class ImageHeaderItem(BaseModel):
-    name: str = Field(
-        ...,
-        description="How it would be referred in a standard llamaparse job, Example: img_p0_1.png",
-    )
-    index: float = Field(..., description="Postion in header row")
-
-
 class Goals(BaseModel):
     livable: str = Field(
         ..., description="The text under the Livable heading, in the blue table"
@@ -93,10 +85,6 @@ class CitationItem(BaseModel):
 
 
 class ExtractedData(BaseModel):
-    image_header: List[ImageHeaderItem] = Field(
-        ...,
-        description="Image source info for the image header at the beginning of the chapter. Should be 3 images.",
-    )
     goals: Goals = Field(
         ...,
         description="A blue table with a dark blue border that has a header of Goals: In 2050 Williston is...",
@@ -121,10 +109,10 @@ class ExtractedData(BaseModel):
 def extract(pdf_path: str):
     extractor = LlamaExtract(api_key=os.getenv("LLAMA_PARSE_API_KEY"))
 
-    # agent = extractor.create_agent(
-    #     "townplan_table_parser_3", data_schema=ExtractedData.model_json_schema()
-    # )
-    agent = extractor.get_agent(name="townplan_table_parser_3")
+    agent = extractor.create_agent(
+        "townplan_table_parser", data_schema=ExtractedData.model_json_schema()
+    )
+    agent = extractor.get_agent(name="townplan_table_parser")
     result = agent.extract(pdf_path)
     return result.data
 
