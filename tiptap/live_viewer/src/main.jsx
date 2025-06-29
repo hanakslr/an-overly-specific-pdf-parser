@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { extensions } from './extensions';
 
+const API_URL = 'http://localhost:8000';
+
 const Editor = () => {
   const editor = useEditor({
     extensions: extensions,
@@ -14,7 +16,23 @@ const Editor = () => {
       const res = await fetch('/api/get-doc')
       const data = await res.json()
       if (editor && data.content) {
-        editor.commands.setContent(data.content)
+        // Recursively go through data.content and prepend API_URL to image src
+        const updatedContent = {
+          ...data.content,
+          content: data.content.content.map((node) => {
+            if (node.type === 'image' && node.attrs.src) {
+              return {
+                ...node,
+                attrs: {
+                  ...node.attrs,
+                  src: `${API_URL}/images/${node.attrs.src}`,
+                },
+              };
+            }
+            return node;
+          }),
+        };
+        editor.commands.setContent(updatedContent)
       }
     }, 1000)
     return () => clearInterval(interval)
