@@ -47,8 +47,6 @@ def convert_to_prosemirror(state: CustomExtractionState):
 
     prose_mirror_doc = state.prose_mirror_doc.model_copy(update={"content": content})
 
-    print(f"New {prose_mirror_doc=}")
-
     return {
         "custom_nodes": nodes,
         "prose_mirror_doc": prose_mirror_doc,
@@ -81,7 +79,6 @@ def create_image_header(content: List[BlockNode]) -> List[BlockNode]:
             image3 = content[i + 2]
             image_header = ImageheaderNode(content=(image1, image2, image3))
 
-            # Check if the next element after the 3 images is a level 1 heading
             new_content.append(image_header)
             i += 3
         else:
@@ -100,7 +97,7 @@ def create_action_items(
     for action in actions:
         content.append(
             ActionitemNode(
-                content=ParagraphNode(content=[TextNode(text=action.text)]),
+                content=[ParagraphNode(content=[TextNode(text=action.text)])],
                 attrs=ActionitemNode.Attrs(
                     strategy=action.strategy,
                     label=action.label,
