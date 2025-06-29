@@ -1264,6 +1264,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "llama-parse" },
     { name = "llmsherpa" },
+    { name = "pillow" },
     { name = "pymupdf" },
     { name = "uvicorn" },
 ]
@@ -1282,6 +1283,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=0.4.8" },
     { name = "llama-parse", specifier = ">=0.6.35" },
     { name = "llmsherpa", specifier = ">=0.1.4" },
+    { name = "pillow", specifier = ">=11.2.1" },
     { name = "pymupdf", specifier = ">=1.26.1" },
     { name = "uvicorn", specifier = ">=0.34.3" },
 ]

@@ -60,8 +60,6 @@ def match_pages(llama_parse_page: Page, pymupdf_page: PageResult) -> list[Unifie
         if item.type == "text"
     ]
 
-    print(f"\n\n{llama_items_to_match=}\n{pymupdf_items_to_match=}")
-
     my_llm = ChatOpenAI(model="gpt-4o", temperature=0)
     output_parser = PydanticOutputParser(pydantic_object=MatchingResult)
 

@@ -1,8 +1,10 @@
+import io
 import json
 import os
 from typing import List, Union
 
 import pymupdf  # PyMuPDF
+from PIL import Image
 from pydantic import BaseModel
 
 
@@ -80,24 +82,31 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
                             )
 
             elif block_type == 1:  # Image block
-                # Print relevant block details without raw image data
-                image_data = block.get("image")
-                bbox = block.get("bbox")
-                image_name = (
-                    f"{image_dir}/page_{page_num}_image_{len(page_items) + 1}.png"
-                )
-
-                # Save the image from raw bytes
                 try:
                     image_data = block.get("image")
-                    if isinstance(image_data, bytes):
-                        with open(f"{output_dir}/{image_name}", "wb") as f:
-                            f.write(image_data)
-                        page_items.append(
-                            ImageItem(src=image_name, bbox=bbox, page=page_num)
-                        )
+                    if not isinstance(image_data, bytes):
+                        continue
+
+                    # Use Pillow to check if the image is all black
+                    img = Image.open(io.BytesIO(image_data))
+                    if img.convert("L").getextrema() == (0, 0):
+                        # This is a black box image, so we skip it
+                        print(f"Skipping all-black image on page {page_num}")
+                        continue
+
+                    bbox = block.get("bbox")
+                    image_name = (
+                        f"{image_dir}/page_{page_num}_image_{len(page_items) + 1}.png"
+                    )
+
+                    with open(f"{output_dir}/{image_name}", "wb") as f:
+                        f.write(image_data)
+
+                    page_items.append(
+                        ImageItem(src=image_name, bbox=bbox, page=page_num)
+                    )
                 except Exception as e:
-                    print(f"⚠️ Could not extract image on page {page_num}: {e}")
+                    print(f"⚠️ Could not process image on page {page_num}: {e}")
 
         result.append(PageResult(page=page_num, content=page_items))
 
