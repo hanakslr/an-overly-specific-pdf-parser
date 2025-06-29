@@ -20,6 +20,7 @@ from post_processing.custom_extraction import (
     build_custom_extraction_graph,
 )
 from post_processing.insert_images import insert_images
+from post_processing.williston_extraction_schema import ExtractedData
 from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
 from tiptap.tiptap_models import BaseAttrs, DocNode, TiptapNode
@@ -29,6 +30,8 @@ class PipelineState(BaseModel):
     pdf_path: str
     llama_parse_output: LlamaParseOutput = None
     pymupdf_output: PyMuPDFOutput = None
+
+    custom_extracted_data: Optional[ExtractedData] = None
 
     zipped_pages: list[ZippedOutputsPage] = None
 
@@ -261,30 +264,26 @@ def custom_extraction_subgraph(state: PipelineState):
     """
     print("✨ Running custom extraction subgraph")
     custom_extraction_graph = build_custom_extraction_graph()
-    initial_state = CustomExtractionState(pdf_path=state.pdf_path)
+    initial_state = CustomExtractionState(
+        pdf_path=state.pdf_path,
+        prosemirror_doc=state.prose_mirror_doc,
+        custom_extracted_data=state.custom_extracted_data,
+    )
     final_state = custom_extraction_graph.invoke(initial_state)
+    final_state_model = CustomExtractionState(**final_state)
 
-    return {"custom_nodes": final_state["custom_nodes"]}
-
-
-def insert_custom_nodes(state: PipelineState):
-    """
-    Insert the custom nodes into the document.
-    For now, just add them to the end.
-    """
-    print("✍️ Inserting custom nodes into document")
-    updated_content = state.prose_mirror_doc.content + state.custom_nodes
     return {
-        "prose_mirror_doc": state.prose_mirror_doc.model_copy(
-            update={"content": updated_content}
-        )
+        "custom_extracted_data": final_state_model.custom_extracted_data,
     }
 
 
 def update_live_editor(state: PipelineState):
     if state.prose_mirror_doc:
         print("👀  Updating live editor")
-        update_document(state.prose_mirror_doc)
+        try:
+            update_document(state.prose_mirror_doc)
+        except Exception as e:
+            print(f"Something went wrong: {e}")
 
 
 def build_pipeline():
@@ -330,6 +329,7 @@ def build_pipeline():
     builder.add_edge("EmitBlock", "GetNextBlock")
     builder.add_edge("InsertImages", "UpdateLiveEditor")
     builder.add_edge("InsertImages", "CustomNodes")
+    builder.add_edge("CustomNodes", "UpdateLiveEditor")
     builder.add_edge("CustomNodes", END)
 
     return builder.compile()
@@ -368,6 +368,8 @@ if __name__ == "__main__":
             config={"memory": memory, "recursion_limit": 200},
             stream_mode="debug",
         ):
+            ## There is a state bug here. It only store the state input so
+            ## the output of the last job wont be saved.
             payload = state_snapshot.get("payload", None)
             if payload:
                 input = payload.get("input")

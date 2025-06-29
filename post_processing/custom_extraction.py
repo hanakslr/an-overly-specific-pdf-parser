@@ -1,18 +1,20 @@
-from typing import List
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel
 
-from post_processing.llama_extract import ExtractedData, extract
-from tiptap.tiptap_models import TiptapNode
+from post_processing.llama_extract import extract
+from post_processing.williston_extraction_schema import ExtractedData
+from tiptap.tiptap_models import DocNode, TiptapNode
 
 load_dotenv()
 
 
 class CustomExtractionState(BaseModel):
     pdf_path: str
-    extracted_data: ExtractedData = None
+    custom_extracted_data: Optional[ExtractedData] = None  # ExtractedData
+    prose_mirror_doc: Optional[DocNode] = None
     custom_nodes: List[TiptapNode] = []
 
 
@@ -24,7 +26,11 @@ def convert_to_prosemirror(state: CustomExtractionState):
 
 
 def extract_custom(state: CustomExtractionState):
-    return {"extracted_data": extract(state.pdf_path)}
+    if state.custom_extracted_data:
+        print("⏭️   Already extracted.")
+        return {}
+
+    return {"custom_extracted_data": extract(state.pdf_path)}
 
 
 def build_custom_extraction_graph():
