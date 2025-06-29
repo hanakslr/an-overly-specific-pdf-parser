@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <title>Tiptap Live Editor</title>
+    <style>
+      /* Make images within image headers shrink to fit */
+      [data-type="image-row"] img {
+        flex: 1;
+        max-width: 100%;
+        height: auto;
+        object-fit: cover;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

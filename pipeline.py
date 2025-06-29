@@ -264,16 +264,19 @@ def custom_extraction_subgraph(state: PipelineState):
     """
     print("✨ Running custom extraction subgraph")
     custom_extraction_graph = build_custom_extraction_graph()
+    print(f"Creating init state with {state.prose_mirror_doc=}")
     initial_state = CustomExtractionState(
         pdf_path=state.pdf_path,
-        prosemirror_doc=state.prose_mirror_doc,
+        prose_mirror_doc=state.prose_mirror_doc,
         custom_extracted_data=state.custom_extracted_data,
     )
     final_state = custom_extraction_graph.invoke(initial_state)
     final_state_model = CustomExtractionState(**final_state)
+    print(f"converted invoked: {final_state_model=}")
 
     return {
         "custom_extracted_data": final_state_model.custom_extracted_data,
+        "prose_mirror_doc": final_state_model.prose_mirror_doc,
     }
 
 

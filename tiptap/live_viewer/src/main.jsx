@@ -29,6 +29,23 @@ const Editor = () => {
                 },
               };
             }
+            if (node.type === "imageHeader") {
+              return {
+                ...node,
+                content: node.content.map((imageNode) => {
+                  if (imageNode.type === 'image' && imageNode.attrs.src) {
+                    return {
+                      ...imageNode,
+                      attrs: {
+                        ...imageNode.attrs,
+                        src: `${API_URL}/images/${imageNode.attrs.src}`,
+                      },
+                    };
+                  }
+                  return imageNode;
+                }),
+              };
+            }
             return node;
           }),
         };

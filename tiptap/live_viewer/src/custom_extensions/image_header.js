@@ -22,7 +22,10 @@ export const ImageHeader = Node.create({
   renderHTML({ HTMLAttributes }) {
     return [
       'div',
-      mergeAttributes(HTMLAttributes, { 'data-type': 'image-row', style: 'display: flex; gap: 8px;' }),
+      mergeAttributes(HTMLAttributes, { 
+        'data-type': 'image-row', 
+        style: 'display: flex; gap: 8px; width: 100%; ' 
+      }),
       0, // The child images will be rendered here
     ]
   },
