@@ -1,5 +1,5 @@
 import sys
-from typing import Optional
+from typing import Optional, Type
 
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
@@ -9,11 +9,21 @@ from pydantic import BaseModel, computed_field
 from doc_server.helpers import update_document
 from etl.llama_parse import LlamaParseOutput, parse
 from etl.pymupdf_parse import PyMuPDFOutput, extract
-from etl.zip_llama_pymupdf import UnifiedBlock, ZippedOutputsPage, match_blocks
+from etl.zip_llama_pymupdf import (
+    UnifiedBlock,
+    ZippedOutputsPage,
+    match_pages,
+)
 from pipeline_state_helpers import draw_pipeline, resume_from_latest, save_output
-from rule_registry.conversion_rules import ConversionRuleRegistry
+from post_processing.custom_extraction import (
+    CustomExtractionState,
+    build_custom_extraction_graph,
+)
+from post_processing.insert_images import insert_images
+from post_processing.williston_extraction_schema import ExtractedData
+from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
-from tiptap.tiptap_models import DocNode
+from tiptap.tiptap_models import BaseAttrs, DocNode, TiptapNode
 
 
 class PipelineState(BaseModel):
@@ -21,9 +31,12 @@ class PipelineState(BaseModel):
     llama_parse_output: LlamaParseOutput = None
     pymupdf_output: PyMuPDFOutput = None
 
+    custom_extracted_data: Optional[ExtractedData] = None
+
     zipped_pages: list[ZippedOutputsPage] = None
 
     prose_mirror_doc: DocNode = None
+    custom_nodes: list[TiptapNode] = []
 
     block_index: Optional[int] = -1
     page_index: Optional[int] = -1
@@ -31,6 +44,9 @@ class PipelineState(BaseModel):
     @computed_field
     @property
     def current_block(self) -> Optional[UnifiedBlock]:
+        if not self.zipped_pages:
+            return None
+
         if self.page_index is None or self.block_index is None:
             return None
 
@@ -62,10 +78,7 @@ def llama_parse(state: PipelineState):
         return {}
 
     print("🔄 Running LlamaParse...")
-    result = parse(state.pdf_path)
-    # Convert the list of dictionaries to LlamaParseOutput
-    # The parse function returns a list, but we expect a single LlamaParseOutput
-    llama_parse_output = LlamaParseOutput(**result[0])
+    llama_parse_output = parse(state.pdf_path)
     return {"llama_parse_output": llama_parse_output}
 
 
@@ -91,6 +104,8 @@ def zip_outputs(state: PipelineState):
         print("⏭️  Zipping pages already completed, skipping...")
         return {}
 
+    print("🧹  Zipping pages")
+
     assert len(state.llama_parse_output.pages) == len(state.pymupdf_output.pages)
 
     pages = []
@@ -101,7 +116,7 @@ def zip_outputs(state: PipelineState):
             page=i + 1,
             llama_parse_page=lp_page,
             pymupdf_page=pm_page,
-            unified_blocks=match_blocks(lp_page, pm_page),
+            unified_blocks=match_pages(lp_page, pm_page),
         )
         pages.append(zipped_page)
 
@@ -119,7 +134,7 @@ def get_next_block(state: PipelineState):
     """
     Get the next block to process. If no more blocks, return None to end the pipeline.
     """
-    print(f"\n\n➡️  Getting next block after {state.page_index=} {state.block_index=}")
+    print(f"\n➡️  Getting next block after {state.page_index=} {state.block_index=}")
 
     # Did we already finish?
     if state.block_index is None and state.page_index is None:
@@ -185,16 +200,16 @@ def should_emit_block(state: PipelineState) -> str:
         return "ProposeNewRule"
 
 
-def should_continue_processing(state: PipelineState) -> bool:
+def should_continue_processing_blocks(state: PipelineState) -> bool:
     """
     Conditional edge function to determine if we should continue processing blocks.
-    Returns 'RuleForBlock' if there is a block we should process, 'END' otherwise.
+    Returns 'RuleForBlock' if there is a block we should process, 'InsertImages' otherwise.
     """
     # Check if we have more blocks to process
     if state.block_index is not None and state.page_index is not None:
         return "RuleForBlock"
     else:
-        return "END"
+        return "InsertImages"
 
 
 def emit_block(state: PipelineState):
@@ -203,7 +218,9 @@ def emit_block(state: PipelineState):
     """
     print(f"✏️  Emiting node using {state.current_block.conversion_rule}")
     # Get the conversion rule by ID
-    rule_class = ConversionRuleRegistry._rules.get(state.current_block.conversion_rule)
+    rule_class: Type[ConversionRule] = ConversionRuleRegistry._rules.get(
+        state.current_block.conversion_rule
+    )
     if not rule_class:
         raise ValueError(
             f"Conversion rule '{state.current_block.conversion_rule}' not found"
@@ -218,9 +235,19 @@ def emit_block(state: PipelineState):
     )
 
     # Construct the node using the rule
-    constructed_node = rule.construct_node(
+    constructed_node: TiptapNode = rule.construct_node(
         state.current_block.llama_item, pymupdf_input
     )
+
+    if constructed_node:
+        if not constructed_node.attrs:
+            # If attrs is None, we need to find the correct Attrs class to instantiate.
+            # It could be BaseAttrs or a node-specific subclass.
+            # The type hint for the attrs field on the node class will tell us.
+            constructed_node.attrs = BaseAttrs()
+
+        # Now we can safely set the unified_block_id
+        constructed_node.attrs.unified_block_id = state.current_block.id
 
     # Add the constructed node to the prose mirror document content
     updated_content = state.prose_mirror_doc.content + [constructed_node]
@@ -232,10 +259,34 @@ def emit_block(state: PipelineState):
     }
 
 
+def custom_extraction_subgraph(state: PipelineState):
+    """
+    Run the custom extraction subgraph to find and convert
+    special structures from the document into prosemirror nodes.
+    """
+    print("✨ Running custom extraction subgraph")
+    custom_extraction_graph = build_custom_extraction_graph()
+    initial_state = CustomExtractionState(
+        pdf_path=state.pdf_path,
+        prose_mirror_doc=state.prose_mirror_doc,
+        custom_extracted_data=state.custom_extracted_data,
+    )
+    final_state = custom_extraction_graph.invoke(initial_state)
+    final_state_model = CustomExtractionState(**final_state)
+
+    return {
+        "custom_extracted_data": final_state_model.custom_extracted_data,
+        "prose_mirror_doc": final_state_model.prose_mirror_doc,
+    }
+
+
 def update_live_editor(state: PipelineState):
     if state.prose_mirror_doc:
         print("👀  Updating live editor")
-        update_document(state.prose_mirror_doc)
+        try:
+            update_document(state.prose_mirror_doc)
+        except Exception as e:
+            print(f"Something went wrong: {e}")
 
 
 def build_pipeline():
@@ -260,13 +311,15 @@ def build_pipeline():
     builder.add_node("RuleForBlock", get_rule_for_block)
     builder.add_node("ProposeNewRule", propose_new_rule_node)
     builder.add_node("EmitBlock", emit_block)
+    builder.add_node("InsertImages", insert_images)
+    builder.add_node("CustomNodes", custom_extraction_subgraph)
 
     builder.add_edge("InitProseMirror", "GetNextBlock")
 
     builder.add_conditional_edges(
         "GetNextBlock",
-        should_continue_processing,
-        {"RuleForBlock": "RuleForBlock", "END": END},
+        should_continue_processing_blocks,
+        {"RuleForBlock": "RuleForBlock", "InsertImages": "InsertImages"},
     )
 
     builder.add_conditional_edges(
@@ -277,6 +330,10 @@ def build_pipeline():
     builder.add_edge("ProposeNewRule", "EmitBlock")
     builder.add_edge("EmitBlock", "UpdateLiveEditor")
     builder.add_edge("EmitBlock", "GetNextBlock")
+    builder.add_edge("InsertImages", "UpdateLiveEditor")
+    builder.add_edge("InsertImages", "CustomNodes")
+    builder.add_edge("CustomNodes", "UpdateLiveEditor")
+    builder.add_edge("CustomNodes", END)
 
     return builder.compile()
 
@@ -311,9 +368,11 @@ if __name__ == "__main__":
     try:
         for state_snapshot in graph.stream(
             initial_state,
-            config={"memory": memory, "recursion_limit": 100},
+            config={"memory": memory, "recursion_limit": 500},
             stream_mode="debug",
         ):
+            ## There is a state bug here. It only store the state input so
+            ## the output of the last job wont be saved.
             payload = state_snapshot.get("payload", None)
             if payload:
                 input = payload.get("input")

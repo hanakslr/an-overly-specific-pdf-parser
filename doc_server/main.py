@@ -6,9 +6,17 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI()
+
+# Mount the static files directory
+app.mount(
+    "/images",
+    StaticFiles(directory="../output/images/pymupdf"),
+    name="images",
+)
 
 # Allow frontend to fetch from browser
 app.add_middleware(

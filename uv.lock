@@ -887,6 +887,18 @@ wheels = [
 ]
 
 [[package]]
+name = "llmsherpa"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a9/3a/aa8e95bb37af926953314601cb2cc98e0e03846006d1ba13569e7ba6cb8e/llmsherpa-0.1.4.tar.gz", hash = "sha256:18789840ded3d7e37db6a5c668dac2b0a58f20e426beaed3e60554dee0a5ecb0", size = 17618 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/14/9292de86e30e935df9c51da95dc530b3755937289a597566a12b86d1388e/llmsherpa-0.1.4-py3-none-any.whl", hash = "sha256:88a651eacf221a997a9a9795903fbb70ddb211cd2e82831507de01284c917667", size = 13018 },
+]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1251,6 +1263,8 @@ dependencies = [
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "llama-parse" },
+    { name = "llmsherpa" },
+    { name = "pillow" },
     { name = "pymupdf" },
     { name = "uvicorn" },
 ]
@@ -1268,6 +1282,8 @@ requires-dist = [
     { name = "langchain-openai", specifier = ">=0.3.25" },
     { name = "langgraph", specifier = ">=0.4.8" },
     { name = "llama-parse", specifier = ">=0.6.35" },
+    { name = "llmsherpa", specifier = ">=0.1.4" },
+    { name = "pillow", specifier = ">=11.2.1" },
     { name = "pymupdf", specifier = ">=1.26.1" },
     { name = "uvicorn", specifier = ">=0.34.3" },
 ]

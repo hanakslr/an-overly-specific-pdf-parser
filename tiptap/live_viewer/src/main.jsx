@@ -1,16 +1,13 @@
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
+import { extensions } from './extensions';
+
+const API_URL = 'http://localhost:8000';
 
 const Editor = () => {
   const editor = useEditor({
-    extensions: [StarterKit, Image, Table, TableRow, TableCell, TableHeader],
+    extensions: extensions,
     content: '',
   })
 
@@ -19,7 +16,40 @@ const Editor = () => {
       const res = await fetch('/api/get-doc')
       const data = await res.json()
       if (editor && data.content) {
-        editor.commands.setContent(data.content)
+        // Recursively go through data.content and prepend API_URL to image src
+        const updatedContent = {
+          ...data.content,
+          content: data.content.content.map((node) => {
+            if (node.type === 'image' && node.attrs.src) {
+              return {
+                ...node,
+                attrs: {
+                  ...node.attrs,
+                  src: `${API_URL}/images/${node.attrs.src}`,
+                },
+              };
+            }
+            if (node.type === "imageHeader") {
+              return {
+                ...node,
+                content: node.content.map((imageNode) => {
+                  if (imageNode.type === 'image' && imageNode.attrs.src) {
+                    return {
+                      ...imageNode,
+                      attrs: {
+                        ...imageNode.attrs,
+                        src: `${API_URL}/images/${imageNode.attrs.src}`,
+                      },
+                    };
+                  }
+                  return imageNode;
+                }),
+              };
+            }
+            return node;
+          }),
+        };
+        editor.commands.setContent(updatedContent)
       }
     }, 1000)
     return () => clearInterval(interval)

@@ -29,7 +29,10 @@ def parse(pdf_path: str):
     """
     # Initialize the parser
     parser = LlamaParse(
-        api_key=os.getenv("LLAMA_PARSE_API_KEY"), verbose=True, premium_mode=True
+        api_key=os.getenv("LLAMA_PARSE_API_KEY"),
+        verbose=True,
+        premium_mode=True,
+        system_prompt_append="Do not include the page numbers at the bottom right of pages. Do not generate descriptions of images. Do not OCR images that are charts into real charts - if it is an image leave it an image.",
     )
     json_objs = parser.get_json_result(file_path=pdf_path)
     image_dir = f"output/images/llamaparse/{os.path.basename(pdf_path)}"
@@ -40,7 +43,9 @@ def parse(pdf_path: str):
 
     print(json.dumps(metadata, indent=2))
 
-    return json_objs
+    # Convert the list of dictionaries to LlamaParseOutput
+    # The parse function returns a list, but we expect a single LlamaParseOutput
+    return LlamaParseOutput(**json_objs[0])
 
 
 def save_images(parser, json_objs, image_dir):
@@ -99,8 +104,4 @@ if __name__ == "__main__":
         with open(
             "output/llamaparse/llamaparse_output.json", "w", encoding="utf-8"
         ) as f:
-            # Convert the result to a list of Pydantic models and then serialize
-            # Since result is a list of dicts, we need to convert each dict to a LlamaParseOutput model
-            pydantic_models = [LlamaParseOutput(**item) for item in result]
-            json_data = [model.model_dump() for model in pydantic_models]
-            json.dump(json_data, f, indent=2, ensure_ascii=False)
+            json.dump(result.model_dump(), f, indent=2, ensure_ascii=False)

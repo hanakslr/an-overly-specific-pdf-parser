@@ -18,5 +18,5 @@ class HeadingConversion(ConversionRule):
     ) -> HeadingNode:
         return HeadingNode(
             attrs=HeadingNode.Attrs(level=llamaparse_input.lvl),
-            content=[TextNode(text=llamaparse_input.value)],
+            content=[TextNode(text=llamaparse_input.value or " ")],
         )

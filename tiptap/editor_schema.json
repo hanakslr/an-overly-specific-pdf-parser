@@ -156,6 +156,13 @@
         }
       },
       "defining": false
+    },
+    "imageHeader": {
+      "group": "block",
+      "content": "image image image",
+      "marks": null,
+      "attrs": {},
+      "defining": false
     }
   },
   "marks": {

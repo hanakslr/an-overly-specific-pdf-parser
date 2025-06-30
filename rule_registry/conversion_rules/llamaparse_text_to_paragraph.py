@@ -16,4 +16,4 @@ class LlamaparseTextToParagraphConversion(ConversionRule):
     def construct_node(
         cls, llamaparse_input: PageItem, pymupdf_inputs: list[Item]
     ) -> ParagraphNode:
-        return ParagraphNode(content=[TextNode(text=llamaparse_input.value)])
+        return ParagraphNode(content=[TextNode(text=llamaparse_input.value or " ")])
