@@ -1,7 +1,7 @@
 import io
 import json
 import os
-from typing import List, Union
+from typing import Any, List, Union
 
 import pymupdf  # PyMuPDF
 from PIL import Image
@@ -17,8 +17,9 @@ class TextItem(Item):
     type: str = "text"
     page: int
     text: str
+    color: tuple[int, int, int]
     font: str
-    size: float
+    size: int
     bbox: tuple[float, float, float, float]  # [x0, y0, x1, y1]
 
 
@@ -56,13 +57,12 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
 
     # We will store images in images/pymupdf/{pdf_path}
     # Ensure the image output directory exists
-    output_dir = "output/images/pymupdf"
-    image_dir = f"{os.path.basename(pdf_path)}"
-    os.makedirs(image_dir, exist_ok=True)
+    output_dir = f"output/images/pymupdf/{os.path.basename(pdf_path)}"
+    os.makedirs(output_dir, exist_ok=True)
 
     for page_num, page in enumerate(doc, start=1):
         page_items: List[Union[TextItem, ImageItem]] = []
-        blocks = page.get_text("dict")["blocks"]
+        blocks = page.get_text("dict", flags=pymupdf.TEXTFLAGS_TEXT)["blocks"]
 
         for block in blocks:
             block_type = block.get("type")
@@ -74,8 +74,9 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
                             page_items.append(
                                 TextItem(
                                     text=span["text"].strip(),
+                                    color=pymupdf.sRGB_to_rgb(span["color"]),
                                     font=span["font"],
-                                    size=span["size"],
+                                    size=round(span["size"]),
                                     page=page_num,
                                     bbox=span.get("bbox"),  # Get bbox from span
                                 )
@@ -95,19 +96,20 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
                         continue
 
                     bbox = block.get("bbox")
-                    image_name = (
-                        f"{image_dir}/page_{page_num}_image_{len(page_items) + 1}.png"
-                    )
+                    image_name = f"page_{page_num}_image_{len(page_items) + 1}.png"
 
                     with open(f"{output_dir}/{image_name}", "wb") as f:
                         f.write(image_data)
 
                     page_items.append(
-                        ImageItem(src=image_name, bbox=bbox, page=page_num)
+                        ImageItem(
+                            src=f"{os.path.basename(pdf_path)}/{image_name}",
+                            bbox=bbox,
+                            page=page_num,
+                        )
                     )
                 except Exception as e:
                     print(f"⚠️ Could not process image on page {page_num}: {e}")
-
         result.append(PageResult(page=page_num, content=page_items))
 
     return result
@@ -127,6 +129,7 @@ def condense_matching_elements(result: List[PageResult]):
                 if (
                     prev_element.type == "text"
                     and prev_element.font == item.font
+                    and prev_element.color == item.color
                     and prev_element.size == item.size
                 ):
                     prev_element.text = f"{prev_element.text} {item.text}"

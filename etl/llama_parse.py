@@ -29,7 +29,10 @@ def parse(pdf_path: str):
     """
     # Initialize the parser
     parser = LlamaParse(
-        api_key=os.getenv("LLAMA_PARSE_API_KEY"), verbose=True, premium_mode=True
+        api_key=os.getenv("LLAMA_PARSE_API_KEY"),
+        verbose=True,
+        premium_mode=True,
+        system_prompt_append="Do not include the page numbers at the bottom right of pages. Do not generate descriptions of images. Do not OCR images that are charts into real charts - if it is an image leave it an image.",
     )
     json_objs = parser.get_json_result(file_path=pdf_path)
     image_dir = f"output/images/llamaparse/{os.path.basename(pdf_path)}"

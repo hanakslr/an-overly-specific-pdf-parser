@@ -368,7 +368,7 @@ if __name__ == "__main__":
     try:
         for state_snapshot in graph.stream(
             initial_state,
-            config={"memory": memory, "recursion_limit": 200},
+            config={"memory": memory, "recursion_limit": 500},
             stream_mode="debug",
         ):
             ## There is a state bug here. It only store the state input so
