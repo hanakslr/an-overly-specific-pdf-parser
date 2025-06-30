@@ -1,15 +1,26 @@
 # Multi-Chapter Pipeline Guide
 
-This guide explains the new multi-chapter functionality that allows the pipeline to process entire PDFs by automatically detecting and extracting individual chapters.
+This guide explains the new multi-chapter functionality that allows processing entire PDFs by automatically detecting and extracting individual chapters using a clean separation of concerns architecture.
 
 ## Overview
 
-The enhanced pipeline now supports:
-- **Automatic chapter detection** using PyMuPDF to find chapter headers with specific font criteria
-- **Interactive chapter approval** allowing users to review and approve detected chapters
-- **Individual chapter processing** where each chapter is processed independently
-- **Chapter rerun capability** to reprocess specific chapters
-- **Combined output** merging all processed chapters into a final document
+The multi-chapter system consists of two main components:
+
+1. **`pipeline.py`** - The original single-document pipeline (unchanged)
+2. **`multi_chapter_pipeline.py`** - New orchestrator script that handles:
+   - **Automatic chapter detection** using PyMuPDF to find chapter headers with specific font criteria
+   - **Interactive chapter approval** allowing users to review and approve detected chapters
+   - **Individual chapter processing** by calling `pipeline.py` for each chapter
+   - **Chapter rerun capability** to reprocess specific chapters
+   - **Combined output** merging all processed chapters into a final document
+
+## Architecture Benefits
+
+- **Clean separation of concerns**: `pipeline.py` stays focused on single document processing
+- **No complexity added to core pipeline**: Multi-chapter logic is completely isolated
+- **Independent chapter processing**: Each chapter runs in its own pipeline instance
+- **Easy testing and debugging**: Can test single chapters or the orchestrator separately
+- **Backward compatibility**: Existing single-document workflows unchanged
 
 ## Chapter Detection Criteria
 
@@ -20,41 +31,35 @@ The system detects chapter headers by looking for text with:
 
 ## Usage
 
-### Basic Multi-Chapter Processing
+### Single Document Processing (Original)
 
 ```bash
+# Process a single document or chapter
 python pipeline.py your_document.pdf
-```
-
-This will:
-1. Detect chapters automatically
-2. Present detected chapters for approval
-3. Extract approved chapters as separate PDFs
-4. Process each chapter through the full pipeline
-5. Combine outputs into a final document
-
-### Command Line Options
-
-```bash
-# Force single-chapter mode (skip chapter detection)
-python pipeline.py your_document.pdf --single-chapter
 
 # Resume from latest saved state
 python pipeline.py your_document.pdf --resume-latest
+```
 
-# List available chapters from previous runs
-python pipeline.py your_document.pdf --list-chapters
+### Multi-Chapter Processing (New)
+
+```bash
+# Detect and process all chapters
+python multi_chapter_pipeline.py your_document.pdf
+
+# List existing chapters and outputs
+python multi_chapter_pipeline.py your_document.pdf --list-chapters
 
 # Process only a specific chapter
-python pipeline.py your_document.pdf --chapter chapter_1_Introduction
+python multi_chapter_pipeline.py your_document.pdf --chapter-only chapter_1_Introduction
 
-# Combine options
-python pipeline.py your_document.pdf --resume-latest --chapter chapter_2_Methods
+# Resume existing pipeline states
+python multi_chapter_pipeline.py your_document.pdf --resume
 ```
 
 ### Chapter Approval Process
 
-When chapters are detected, you'll see an interactive prompt:
+When using `multi_chapter_pipeline.py`, you'll see an interactive prompt:
 
 ```
 📖 Chapter Detection Results for: your_document.pdf
@@ -87,48 +92,33 @@ Enter your choice:
 - `1,2,3`: Approve specific chapters by number (comma-separated)
 - `q` or `quit`: Exit without processing chapters
 
-## Architecture Changes
+## Multi-Chapter Processing Flow
 
-### New State Structure
+1. **Chapter Detection**: `multi_chapter_pipeline.py` analyzes PDF for chapter headers
+2. **Chapter Approval**: User reviews and approves detected chapters
+3. **Chapter Extraction**: Individual chapter PDFs are created
+4. **Chapter Processing**: For each approved chapter:
+   - `pipeline.py` is called with the chapter PDF
+   - Complete single-document pipeline runs
+   - Output is saved independently
+5. **Output Combination**: All chapter outputs are merged into a combined document
 
-The pipeline now uses a hierarchical state structure:
+## New Components
 
-```python
-class ChapterPipelineState(BaseModel):
-    """State for processing a single chapter"""
-    chapter: ChapterRange
-    chapter_pdf_path: str
-    llama_parse_output: LlamaParseOutput = None
-    pymupdf_output: PyMuPDFOutput = None
-    # ... other chapter-specific fields
+### Chapter Detection (`etl/chapter_detection.py`)
+- Detects chapter headers using PyMuPDF
+- Analyzes font, size, and text patterns
+- Provides interactive approval interface
 
-class PipelineState(BaseModel):
-    """Main pipeline state"""
-    pdf_path: str
-    
-    # Multi-chapter support
-    chapter_detection_result: Optional[ChapterDetectionResult] = None
-    chapters: Dict[str, ChapterPipelineState] = {}
-    current_chapter_id: Optional[str] = None
-    processing_mode: str = "single"  # "single" or "multi"
-    
-    # Legacy single-chapter fields (for backward compatibility)
-    # ... existing fields
-```
+### PDF Chapter Extractor (`etl/pdf_chapter_extractor.py`)
+- Extracts page ranges as separate PDF files
+- Organizes extracted chapters in `output/chapters/`
 
-### New Pipeline Flow
-
-1. **Chapter Detection**: Analyze PDF for chapter headers
-2. **Chapter Approval**: User reviews and approves chapters
-3. **Chapter Extraction**: Extract approved chapters as separate PDFs
-4. **Chapter Processing Loop**: For each approved chapter:
-   - LlamaParse
-   - PyMuPDF extraction
-   - Content zipping
-   - Block processing
-   - Image insertion
-   - Custom extraction
-5. **Output Combination**: Merge all chapter outputs
+### Multi-Chapter Orchestrator (`multi_chapter_pipeline.py`)
+- Main orchestrator script
+- Manages the entire multi-chapter workflow
+- Calls `pipeline.py` for individual chapters
+- Combines and organizes results
 
 ### File Organization
 
@@ -156,41 +146,50 @@ output/
 You can reprocess individual chapters without affecting others:
 
 ```bash
-# List available chapters
-python pipeline.py document.pdf --list-chapters
+# List available chapters and outputs
+python multi_chapter_pipeline.py document.pdf --list-chapters
 
 # Reprocess a specific chapter
-python pipeline.py document.pdf --chapter chapter_2_Methods
+python multi_chapter_pipeline.py document.pdf --chapter-only chapter_2_Methods
+
+# Reprocess with resume
+python multi_chapter_pipeline.py document.pdf --chapter-only chapter_2_Methods --resume
 ```
 
-### Backward Compatibility
+### Single Document Processing
 
-The system maintains full backward compatibility:
-- Single-chapter PDFs are processed normally
-- Existing command-line options work unchanged
-- Legacy state files can be resumed
+For single documents or when you don't need chapter detection:
+
+```bash
+# Process normally (original workflow)
+python pipeline.py document.pdf
+
+# Resume previous processing
+python pipeline.py document.pdf --resume-latest
+```
 
 ### Error Handling
 
-- If no chapters are detected, processing falls back to single-chapter mode
-- If chapter detection fails, the user can force single-chapter mode with `--single-chapter`
-- Individual chapter failures don't affect other chapters
+- **No chapters detected**: The orchestrator will inform you to use `pipeline.py` directly
+- **Individual chapter failures**: Don't affect other chapters; failed chapters are clearly reported
+- **Pipeline errors**: Each chapter runs in isolation, so errors are contained
 
 ### Performance Benefits
 
-- **Parallel processing potential**: Chapters can be processed independently
-- **Incremental progress**: Complete chapters are saved, allowing partial resume
-- **Targeted reprocessing**: Only specific chapters need to be rerun when needed
+- **True parallel processing potential**: Chapters are completely independent
+- **Incremental progress**: Complete chapters are saved, allowing selective reprocessing
+- **Targeted reprocessing**: Only specific chapters need to be rerun
+- **No complexity overhead**: Single documents run with zero multi-chapter overhead
 
 ## Troubleshooting
 
 ### No Chapters Detected
 
-If the system doesn't detect chapters:
+If `multi_chapter_pipeline.py` doesn't detect chapters:
 
 1. Check if your PDF uses the expected font (`BumperSticker`) and size (`28`) for chapter headers
 2. Verify chapter headers follow expected patterns (number + text)
-3. Use `--single-chapter` to process as a single document
+3. Use `pipeline.py` directly to process as a single document
 
 ### Chapter Detection Issues
 
@@ -198,15 +197,22 @@ If chapters are detected incorrectly:
 
 1. Review the detected chapters in the approval prompt
 2. Approve only the correct chapters
-3. Manually adjust chapter ranges if needed (future enhancement)
+3. Use `--chapter-only` to process individual chapters manually
 
 ### Processing Errors
 
 If a chapter fails to process:
 
 1. Check the specific chapter PDF in `output/chapters/`
-2. Try reprocessing just that chapter: `--chapter chapter_id`
-3. Check for font or content issues in that specific chapter
+2. Try reprocessing just that chapter: `--chapter-only chapter_id`
+3. Test the chapter PDF directly with `pipeline.py chapter.pdf`
+4. Check orchestrator output for specific error messages
+
+### Pipeline vs Orchestrator Issues
+
+- **Pipeline errors**: Test individual chapter PDFs with `pipeline.py` directly
+- **Orchestrator errors**: Check chapter detection and PDF extraction steps
+- **Combined output issues**: Verify individual chapter outputs are valid JSON
 
 ## Development Notes
 
@@ -218,29 +224,49 @@ To customize chapter detection criteria, modify `etl/chapter_detection.py`:
 - Modify font/size criteria in `detect_chapter_headers()`
 - Adjust `parse_chapter_text()` for different title formats
 
-### Adding New Chapter Processing Features
+### Adding New Orchestrator Features
 
-The modular design allows easy extension:
+The clean separation allows easy extension:
 
-- Add new processing steps in the pipeline
-- Extend `ChapterPipelineState` for chapter-specific data
-- Implement chapter-specific rules or extraction logic
+- Modify `multi_chapter_pipeline.py` for new orchestration logic
+- Add new command-line options for different processing modes
+- Implement parallel processing for multiple chapters
+- Add new output combination strategies
 
 ### Testing
 
 Test the multi-chapter functionality with:
 
-1. PDFs with clear chapter headers using `BumperSticker` font
-2. Various chapter numbering schemes (1, 2, 3 vs Chapter 1, Chapter 2)
-3. Complex documents with multiple fonts and sizes
-4. Single-chapter documents (should fall back gracefully)
+1. **Chapter Detection**: PDFs with clear chapter headers using `BumperSticker` font
+2. **Pipeline Integration**: Ensure individual chapters process correctly
+3. **Output Combination**: Verify combined outputs are properly structured
+4. **Single-document fallback**: Test with non-chapter documents
 
 ## Future Enhancements
 
-Potential improvements include:
+The clean architecture enables many potential improvements:
 
-- **Manual chapter range editing**: Allow users to adjust detected page ranges
-- **Custom detection criteria**: Configure font/size requirements per document
-- **Parallel chapter processing**: Process multiple chapters simultaneously
-- **Chapter templates**: Save and reuse chapter detection patterns
+### Orchestrator Enhancements
+- **Parallel chapter processing**: Process multiple chapters simultaneously using multiprocessing
+- **Progress tracking**: Real-time progress bars for long-running multi-chapter processing
+- **Smart resume**: Automatically detect and resume incomplete chapter processing
+- **Batch processing**: Process multiple PDFs with similar chapter structures
+
+### Chapter Detection Improvements
+- **Manual chapter range editing**: Interactive editor for adjusting detected page ranges
+- **Custom detection criteria**: Configuration files for different document types
+- **Machine learning detection**: Train models on document-specific chapter patterns
 - **Visual chapter review**: Show thumbnails of detected chapter start pages
+- **Chapter templates**: Save and reuse chapter detection patterns
+
+### Output and Integration
+- **Advanced output formats**: Export to different formats (HTML, Markdown, etc.)
+- **Chapter cross-references**: Maintain links between chapters in combined output
+- **Incremental updates**: Update only changed chapters in large documents
+- **API integration**: REST API for programmatic multi-chapter processing
+
+### Performance and Scalability
+- **Distributed processing**: Process chapters across multiple machines
+- **Caching**: Smart caching of intermediate results
+- **Resource optimization**: Memory and disk usage optimization for large documents
+- **Cloud integration**: Support for cloud-based processing pipelines
