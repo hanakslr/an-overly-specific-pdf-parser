@@ -8,7 +8,7 @@ from schema.block import BaseAttrs, Block
 
 
 # Common parent class for all Tiptap nodes
-class TiptapNode(Block):
+class TiptapNode(Block, polymorphic=True):
     pass
 
 
@@ -28,25 +28,25 @@ ListNode = Union["BulletlistNode", "OrderedlistNode"]
 InlineNode = Union["HardbreakNode", "TextNode"]
 
 
-class ParagraphNode(TiptapNode):
+class ParagraphNode(Block):
     type: Literal["paragraph"] = "paragraph"
     content: Optional[List["InlineNode"]]
     attrs: Optional[BaseAttrs] = None
 
 
-class BlockquoteNode(TiptapNode):
+class BlockquoteNode(Block):
     type: Literal["blockquote"] = "blockquote"
     content: List["BlockNode"]
     attrs: Optional[BaseAttrs] = None
 
 
-class BulletlistNode(TiptapNode):
+class BulletlistNode(Block):
     type: Literal["bulletList"] = "bulletList"
     content: List["ListitemNode"]
     attrs: Optional[BaseAttrs] = None
 
 
-class CodeblockNode(TiptapNode):
+class CodeblockNode(Block):
     type: Literal["codeBlock"] = "codeBlock"
     content: Optional[List["TextNode"]]
 
@@ -56,12 +56,12 @@ class CodeblockNode(TiptapNode):
     attrs: Optional[Attrs] = None
 
 
-class HardbreakNode(TiptapNode):
+class HardbreakNode(Block):
     type: Literal["hardBreak"] = "hardBreak"
     attrs: Optional[BaseAttrs] = None
 
 
-class HeadingNode(TiptapNode):
+class HeadingNode(Block):
     type: Literal["heading"] = "heading"
     content: Optional[List["InlineNode"]]
 
@@ -71,12 +71,12 @@ class HeadingNode(TiptapNode):
     attrs: Optional[Attrs] = None
 
 
-class HorizontalruleNode(TiptapNode):
+class HorizontalruleNode(Block):
     type: Literal["horizontalRule"] = "horizontalRule"
     attrs: Optional[BaseAttrs] = None
 
 
-class ListitemNode(TiptapNode):
+class ListitemNode(Block):
     type: Literal["listItem"] = "listItem"
     content: List[Union["BlockNode", "ParagraphNode"]]
 
@@ -94,7 +94,7 @@ class ListitemNode(TiptapNode):
     attrs: Optional[BaseAttrs] = None
 
 
-class OrderedlistNode(TiptapNode):
+class OrderedlistNode(Block):
     type: Literal["orderedList"] = "orderedList"
     content: List["ListitemNode"]
 
@@ -105,13 +105,13 @@ class OrderedlistNode(TiptapNode):
     attrs: Optional[Attrs] = None
 
 
-class TextNode(TiptapNode):
+class TextNode(Block):
     type: Literal["text"] = "text"
     text: str
     attrs: Optional[BaseAttrs] = None
 
 
-class ImageNode(TiptapNode):
+class ImageNode(Block):
     type: Literal["image"] = "image"
 
     class Attrs(BaseAttrs):
@@ -122,19 +122,19 @@ class ImageNode(TiptapNode):
     attrs: Optional[Attrs] = None
 
 
-class TableNode(TiptapNode):
+class TableNode(Block):
     type: Literal["table"] = "table"
     content: List["TablerowNode"]
     attrs: Optional[BaseAttrs] = None
 
 
-class TablerowNode(TiptapNode):
+class TablerowNode(Block):
     type: Literal["tableRow"] = "tableRow"
     content: Optional[List[Union["TablecellNode", "TableheaderNode"]]]
     attrs: Optional[BaseAttrs] = None
 
 
-class TablecellNode(TiptapNode):
+class TablecellNode(Block):
     type: Literal["tableCell"] = "tableCell"
     content: List["BlockNode"]
 
@@ -146,7 +146,7 @@ class TablecellNode(TiptapNode):
     attrs: Optional[Attrs] = None
 
 
-class TableheaderNode(TiptapNode):
+class TableheaderNode(Block):
     type: Literal["tableHeader"] = "tableHeader"
     content: List["BlockNode"]
 
@@ -158,7 +158,7 @@ class TableheaderNode(TiptapNode):
     attrs: Optional[Attrs] = None
 
 
-class ImageheaderNode(TiptapNode):
+class ImageheaderNode(Block):
     type: Literal["imageHeader"] = "imageHeader"
     content: Tuple["ImageNode", "ImageNode", "ImageNode"]
     attrs: Optional[BaseAttrs] = None

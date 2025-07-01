@@ -1,5 +1,5 @@
 import sys
-from typing import Optional, Type, Union
+from typing import Optional, Type
 
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
@@ -360,10 +360,11 @@ if __name__ == "__main__":
 
     try:
         for state in graph.stream(
-            initial_state.model_dump(),
+            initial_state,
             config={"memory": memory, "recursion_limit": 500},
             stream_mode="values",
         ):
+            print("check")
             final_state = state
     except Exception as e:
         print(f"Got error: {e=}")
