@@ -10,7 +10,7 @@ from llama_cloud_services.parse.types import PageItem
 from pydantic import BaseModel
 
 from etl.pymupdf_parse import Item
-from tiptap.tiptap_models import TiptapNode
+from schema.tiptap_models import TiptapNode
 
 
 class RuleCondition(BaseModel):

@@ -1,0 +1,60 @@
+from typing import Literal, Optional, Tuple, Union
+
+from pydantic import BaseModel
+
+from schema.block import Block
+from schema.tiptap_models import ParagraphNode
+
+
+class GoalItemBlock(Block):
+    type: Literal["goal_item"]
+    content: Tuple[ParagraphNode]
+
+    class Attrs(BaseModel):
+        trait: Union[Literal["livable"], Literal["resilient"], Literal["equitable"]]
+
+    attrs: Attrs
+
+
+class CitationBlock(Block):
+    type: Literal["citation"]
+    content: Tuple[ParagraphNode]
+
+    class Attrs(BaseModel):
+        label: str
+
+    attrs: Attrs
+
+
+class ActionItemBlock(Block):
+    type: Literal["action_item"]
+    content: Tuple[ParagraphNode]
+
+    class Attrs(BaseModel):
+        strategy_id: str
+        label: str
+        time_frame: Optional[str]
+        responsibility: Optional[list[str]]
+        cost: Optional[str]
+
+    attrs: Attrs
+
+
+class StrategyItemBlock(Block):
+    type: Literal["strategy_item"]
+    content: Tuple[ParagraphNode]
+
+    class Attrs(BaseModel):
+        label: str
+
+    attrs: Attrs
+
+
+class ObjectiveItemBlock(Block):
+    type: Literal["objective_item"]
+    content: Tuple[ParagraphNode]
+
+    class Attrs(BaseModel):
+        label: str
+
+    attrs: Attrs

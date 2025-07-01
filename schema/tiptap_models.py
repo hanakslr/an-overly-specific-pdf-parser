@@ -4,9 +4,11 @@ from typing import List, Optional, Tuple, Union
 from pydantic import BaseModel, validator
 from typing_extensions import Literal
 
+from schema.block import Block
+
 
 # Common parent class for all Tiptap nodes
-class TiptapNode(BaseModel):
+class TiptapNode(Block):
     pass
 
 

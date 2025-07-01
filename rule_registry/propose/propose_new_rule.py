@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from doc_server.helpers import append_to_document
 from etl.zip_llama_pymupdf import UnifiedBlock
 from rule_registry.conversion_rules import ConversionRuleRegistry, RuleCondition
-from tiptap.tiptap_models import TiptapNode
+from schema.tiptap_models import TiptapNode
 
 
 class RuleProposal(BaseModel):

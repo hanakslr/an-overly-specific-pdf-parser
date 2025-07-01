@@ -1,7 +1,7 @@
 import io
 import json
 import os
-from typing import Any, List, Union
+from typing import List, Union
 
 import pymupdf  # PyMuPDF
 from PIL import Image

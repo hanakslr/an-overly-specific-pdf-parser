@@ -1,4 +1,4 @@
-from tiptap.tiptap_models import ImageNode
+from schema.tiptap_models import ImageNode
 
 
 def insert_images(state):

@@ -23,7 +23,7 @@ from post_processing.insert_images import insert_images
 from post_processing.williston_extraction_schema import ExtractedData
 from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
-from tiptap.tiptap_models import BaseAttrs, DocNode, TiptapNode
+from schema.tiptap_models import BaseAttrs, DocNode, TiptapNode
 
 
 class PipelineState(BaseModel):

@@ -8,7 +8,7 @@ from post_processing.llama_extract import extract
 from post_processing.williston_extraction_schema import (
     ExtractedData,
 )
-from tiptap.tiptap_models import (
+from schema.tiptap_models import (
     BlockNode,
     DocNode,
     ImageheaderNode,
@@ -80,6 +80,41 @@ def create_image_header(content: List[BlockNode]) -> List[BlockNode]:
         else:
             new_content.append(content[i])
             i += 1
+    return new_content
+
+
+def convert_goals(content: List[BlockNode]) -> List[BlockNode]:
+    """
+    ITerate through our blocks until we find a header where content[0].text.starts with Goals: In 2050.
+    Then convert the following elements into a table.
+    There should be 3 headings and paragraphs for Livable, Resilient, Equitable
+    """
+    new_content = []
+    i = 0
+    while i < len(content):
+        block = content[i]
+        if block.type == "heading" and block.content[0].text.startswith(
+            "Goals: In 2050"
+        ):
+            pass
+        else:
+            new_content.append(content[i])
+
+    return new_content
+
+
+def remove_osa_table_and_citations(content: List[BlockNode]) -> List[BlockNode]:
+    new_content = []
+    i = 0
+    while i < len(content):
+        block = content[i]
+        if block.type == "heading" and block.content[0].text.startswith(
+            "Goals: In 2050"
+        ):
+            pass
+        else:
+            new_content.append(content[i])
+
     return new_content
 
 
