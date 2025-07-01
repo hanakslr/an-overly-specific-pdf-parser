@@ -1,6 +1,6 @@
-from typing import Annotated, Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from schema.block import Block
 from schema.tiptap_models import (
@@ -15,22 +15,6 @@ from schema.tiptap_models import (
     ParagraphNode,
     TableNode,
 )
-
-BlockUnion = Union[
-    "GoalItemBlock",
-    "FactItemBlock",
-    "CitationBlock",
-    BlockquoteNode,
-    BulletlistNode,
-    CodeblockNode,
-    HeadingNode,
-    HorizontalruleNode,
-    ImageNode,
-    ImageheaderNode,
-    OrderedlistNode,
-    ParagraphNode,
-    TableNode,
-]
 
 
 class GoalItemBlock(Block):
@@ -96,3 +80,27 @@ class ObjectiveItemBlock(Block):
         label: str
 
     attrs: Attrs
+
+
+BlockUnion = Union[
+    GoalItemBlock,
+    FactItemBlock,
+    CitationBlock,
+    BlockquoteNode,
+    BulletlistNode,
+    CodeblockNode,
+    HeadingNode,
+    HorizontalruleNode,
+    ImageNode,
+    ImageheaderNode,
+    OrderedlistNode,
+    ParagraphNode,
+    TableNode,
+]
+
+# After all models are defined, rebuild the models that use forward references
+GoalItemBlock.model_rebuild()
+FactItemBlock.model_rebuild()
+CitationBlock.model_rebuild()
+ActionItemBlock.model_rebuild()
+StrategyItemBlock.model_rebuild()

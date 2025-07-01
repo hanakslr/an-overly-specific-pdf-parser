@@ -329,6 +329,11 @@ def build_pipeline():
     return builder.compile()
 
 
+# After all models and the graph are defined, rebuild the PipelineState model
+# to resolve any forward references in BlockUnion.
+PipelineState.model_rebuild()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python pipeline.py <pdf_path> [--resume-latest]")
