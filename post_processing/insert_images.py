@@ -95,4 +95,5 @@ def insert_images(state):
             # If no spot was found, it belongs at the end
             content.append(image_node)
 
+    print(f"Images inserted. {len(content)} blocks total.")
     return {"blocks": content}

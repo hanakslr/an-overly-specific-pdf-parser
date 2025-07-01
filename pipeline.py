@@ -209,13 +209,24 @@ def emit_block(state: PipelineState):
     Construct a node using the conversion rule and add it to the prose mirror document.
     """
     print(f"✏️  Emiting node using {state.current_block.conversion_rule}")
-    # Get the conversion rule by ID
-    rule_class: Type[ConversionRule] = ConversionRuleRegistry._rules.get(
+
+    # Ensure the registry has been initialised and contains all rules. If the rule
+    # isn't found on the first attempt, trigger discovery and retry once before
+    # giving up.
+    rule_class: Type[ConversionRule] | None = ConversionRuleRegistry._rules.get(
         state.current_block.conversion_rule
     )
-    if not rule_class:
+
+    if rule_class is None:
+        # (Re-)discover rules – this is idempotent and inexpensive after the first run.
+        ConversionRuleRegistry.get_all_rules()
+        rule_class = ConversionRuleRegistry._rules.get(
+            state.current_block.conversion_rule
+        )
+
+    if rule_class is None:
         raise ValueError(
-            f"Conversion rule '{state.current_block.conversion_rule}' not found"
+            f"Conversion rule '{state.current_block.conversion_rule}' not found after registry refresh"
         )
 
     # Create an instance of the rule
@@ -244,8 +255,6 @@ def emit_block(state: PipelineState):
     # Add the constructed node to the prose mirror document content
     updated_content = state.blocks + [constructed_node]
 
-    print(f"Updating blocks {updated_content=}")
-
     return {"blocks": updated_content}
 
 
@@ -258,7 +267,7 @@ def custom_extraction_subgraph(state: PipelineState):
     custom_extraction_graph = build_custom_extraction_graph()
     initial_state = CustomExtractionState(
         pdf_path=state.pdf_path,
-        blcoks=state.blocks,
+        blocks=state.blocks,
         custom_extracted_data=state.custom_extracted_data,
     )
     final_state = custom_extraction_graph.invoke(initial_state)
@@ -313,9 +322,9 @@ def build_pipeline():
     builder.add_edge("EmitBlock", "UpdateLiveEditor")
     builder.add_edge("EmitBlock", "GetNextBlock")
     builder.add_edge("InsertImages", "UpdateLiveEditor")
-    builder.add_edge("InsertImages", "CustomNodes")
-    builder.add_edge("CustomNodes", "UpdateLiveEditor")
-    builder.add_edge("CustomNodes", END)
+    builder.add_edge("InsertImages", END)
+    # builder.add_edge("CustomNodes", "UpdateLiveEditor")
+    # builder.add_edge("CustomNodes", END)
 
     return builder.compile()
 
@@ -345,24 +354,24 @@ if __name__ == "__main__":
     draw_pipeline(graph)
 
     memory = MemorySaver()
-    state = initial_state
+    final_state = None
 
     try:
-        for state_snapshot in graph.stream(
-            initial_state,
+        for state in graph.stream(
+            initial_state.model_dump(),
             config={"memory": memory, "recursion_limit": 500},
-            stream_mode="debug",
+            stream_mode="values",
         ):
-            ## There is a state bug here. It only store the state input so
-            ## the output of the last job wont be saved.
-            payload = state_snapshot.get("payload", None)
-            if payload:
-                input = payload.get("input")
-                if input:
-                    state = input
+            final_state = state
     except Exception as e:
         print(f"Got error: {e=}")
     finally:
-        output_filename = save_output(pdf_path, state)
+        if final_state:
+            output_filename = save_output(pdf_path, final_state)
+        else:
+            print(
+                "Pipeline did not produce a final state. Saving initial state instead."
+            )
+            output_filename = save_output(pdf_path, initial_state.model_dump())
 
     print(f"✅ Pipeline complete. Output saved to: {output_filename}")
