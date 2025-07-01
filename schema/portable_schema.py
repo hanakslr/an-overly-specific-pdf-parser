@@ -3,9 +3,34 @@ from typing import Annotated, Literal, Optional, Tuple, Union
 from pydantic import BaseModel, Field
 
 from schema.block import Block
-from schema.tiptap_models import HeadingNode, ParagraphNode
+from schema.tiptap_models import (
+    BlockquoteNode,
+    BulletlistNode,
+    CodeblockNode,
+    HeadingNode,
+    HorizontalruleNode,
+    ImageheaderNode,
+    ImageNode,
+    OrderedlistNode,
+    ParagraphNode,
+    TableNode,
+)
 
-BlockUnion = Annotated[Union[TextBlock, ImageBlock], Field(discriminator="type")]
+BlockUnion = Union[
+    "GoalItemBlock",
+    "FactItemBlock",
+    "CitationBlock",
+    BlockquoteNode,
+    BulletlistNode,
+    CodeblockNode,
+    HeadingNode,
+    HorizontalruleNode,
+    ImageNode,
+    ImageheaderNode,
+    OrderedlistNode,
+    ParagraphNode,
+    TableNode,
+]
 
 
 class GoalItemBlock(Block):

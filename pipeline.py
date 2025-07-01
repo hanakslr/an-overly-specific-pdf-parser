@@ -22,7 +22,7 @@ from post_processing.insert_images import insert_images
 from post_processing.williston_extraction_schema import ExtractedData
 from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
-from schema.block import Block
+from schema.portable_schema import BlockUnion
 from schema.tiptap_models import BaseAttrs, TiptapNode
 
 
@@ -35,7 +35,7 @@ class PipelineState(BaseModel):
 
     zipped_pages: list[ZippedOutputsPage] = None
 
-    blocks: list[Block] = []
+    blocks: list[BlockUnion] = []
 
     block_index: Optional[int] = -1
     page_index: Optional[int] = -1

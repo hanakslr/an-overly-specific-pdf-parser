@@ -8,7 +8,7 @@ from schema.block import BaseAttrs, Block
 
 
 # Common parent class for all Tiptap nodes
-class TiptapNode(Block, polymorphic=True):
+class TiptapNode(Block):
     pass
 
 

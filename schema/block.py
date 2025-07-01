@@ -1,7 +1,6 @@
-from typing import Any, Callable, List, Literal, Optional, Set, Type
+from typing import List, Literal, Optional, Set, Type
 
-from pydantic import BaseModel as PyBaseModel
-from pydantic_core import core_schema
+from pydantic import BaseModel
 
 
 def all_subclasses(cls: Type) -> Set[Type]:
@@ -11,57 +10,57 @@ def all_subclasses(cls: Type) -> Set[Type]:
     )
 
 
-class BaseModel(PyBaseModel, extra="forbid"):
-    __polymorphic__ = False
+# class BaseModel(PyBaseModel, extra="forbid"):
+#     __polymorphic__ = False
 
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        __source: type["PyBaseModel"],
-        __handler: Callable[[Any], core_schema.CoreSchema],
-    ) -> core_schema.CoreSchema:
-        schema = __handler(__source)
-        og_schema_ref = schema["ref"]
-        schema["ref"] += ":aux"
+#     @classmethod
+#     def __get_pydantic_core_schema__(
+#         cls,
+#         __source: type["PyBaseModel"],
+#         __handler: Callable[[Any], core_schema.CoreSchema],
+#     ) -> core_schema.CoreSchema:
+#         schema = __handler(__source)
+#         og_schema_ref = schema["ref"]
+#         schema["ref"] += ":aux"
 
-        return core_schema.no_info_before_validator_function(
-            cls.__convert_to_real_type__, schema=schema, ref=og_schema_ref
-        )
+#         return core_schema.no_info_before_validator_function(
+#             cls.__convert_to_real_type__, schema=schema, ref=og_schema_ref
+#         )
 
-    @classmethod
-    def __convert_to_real_type__(cls, value: Any):
-        if not cls.__polymorphic__:
-            return value
+#     @classmethod
+#     def __convert_to_real_type__(cls, value: Any):
+#         if not cls.__polymorphic__:
+#             return value
 
-        if isinstance(value, dict) is False:
-            return value
+#         if isinstance(value, dict) is False:
+#             return value
 
-        value = value.copy()
+#         value = value.copy()
 
-        subclass = value.pop("type", None)
-        if subclass is None:
-            raise ValueError(f"Missing 'type' in {cls.__name__}")
+#         subclass = value.pop("type", None)
+#         if subclass is None:
+#             raise ValueError(f"Missing 'type' in {cls.__name__}")
 
-        allowable = [dtype for dtype in cls.__subclasses__()]
+#         allowable = [dtype for dtype in cls.__subclasses__()]
 
-        print(f"{allowable=}. looking for {subclass=}")
-        try:
-            sub = next(
-                dtype
-                for dtype in all_subclasses(cls)
-                if getattr(dtype.model_fields.get("type"), "default", None) == subclass
-            )
-        except StopIteration as e:
-            raise TypeError(f"Unsupported subclass: {subclass}") from e
+#         print(f"{allowable=}. looking for {subclass=}")
+#         try:
+#             sub = next(
+#                 dtype
+#                 for dtype in all_subclasses(cls)
+#                 if getattr(dtype.model_fields.get("type"), "default", None) == subclass
+#             )
+#         except StopIteration as e:
+#             raise TypeError(f"Unsupported subclass: {subclass}") from e
 
-        return sub(**value)
+#         return sub(**value)
 
-    def __init_subclass__(cls, polymorphic: bool = False, **kwargs):
-        cls.__polymorphic__ = polymorphic
-        super().__init_subclass__(**kwargs)
+#     def __init_subclass__(cls, polymorphic: bool = False, **kwargs):
+#         cls.__polymorphic__ = polymorphic
+#         super().__init_subclass__(**kwargs)
 
 
-class Block(BaseModel, polymorphic=True):
+class Block(BaseModel):
     def get_text(self) -> Optional[str]:
         """Get the text field"""
         # Leaf nodes usually store their textual value in the `text` attribute.
