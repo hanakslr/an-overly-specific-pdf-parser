@@ -3,11 +3,11 @@ from typing import Literal, Optional, Tuple, Union
 from pydantic import BaseModel
 
 from schema.block import Block
-from schema.tiptap_models import ParagraphNode
+from schema.tiptap_models import HeadingNode, ParagraphNode
 
 
 class GoalItemBlock(Block):
-    type: Literal["goal_item"]
+    type: Literal["goal_item"] = "goal_item"
     content: Tuple[ParagraphNode]
 
     class Attrs(BaseModel):
@@ -16,8 +16,19 @@ class GoalItemBlock(Block):
     attrs: Attrs
 
 
+class FactItemBlock(Block):
+    type: Literal["fact_item"] = "fact_item"
+    content: Tuple[HeadingNode, ParagraphNode]
+
+    class Attrs(BaseModel):
+        label: str
+        collection: Union[Literal["facts"], Literal["public_engagement"]]
+
+    attrs: Attrs
+
+
 class CitationBlock(Block):
-    type: Literal["citation"]
+    type: Literal["citation"] = "citation"
     content: Tuple[ParagraphNode]
 
     class Attrs(BaseModel):
@@ -27,7 +38,7 @@ class CitationBlock(Block):
 
 
 class ActionItemBlock(Block):
-    type: Literal["action_item"]
+    type: Literal["action_item"] = "action_item"
     content: Tuple[ParagraphNode]
 
     class Attrs(BaseModel):
@@ -41,7 +52,7 @@ class ActionItemBlock(Block):
 
 
 class StrategyItemBlock(Block):
-    type: Literal["strategy_item"]
+    type: Literal["strategy_item"] = "strategy_item"
     content: Tuple[ParagraphNode]
 
     class Attrs(BaseModel):
@@ -51,7 +62,7 @@ class StrategyItemBlock(Block):
 
 
 class ObjectiveItemBlock(Block):
-    type: Literal["objective_item"]
+    type: Literal["objective_item"] = "objective_item"
     content: Tuple[ParagraphNode]
 
     class Attrs(BaseModel):

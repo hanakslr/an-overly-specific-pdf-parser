@@ -1,18 +1,9 @@
-from typing import List, Optional, Tuple, Union
-from uuid import UUID, uuid4
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Block(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
-
-    # Blocks contain a `content` field that is itself a list/tuple of tiptap
-    # nodes which eventually resolve down to `TextNode` instances that expose a
-    # `text` attribute.  We model that here so that all subclasses inherit the
-    # attribute (they can still override it with a narrower type if necessary).
-    content: Optional[Union[List["Block"], Tuple["Block", ...]]] = None
-
     def get_text(self) -> Optional[str]:
         """Get the text field"""
         # Leaf nodes usually store their textual value in the `text` attribute.
