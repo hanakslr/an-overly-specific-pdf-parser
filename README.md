@@ -17,7 +17,7 @@ This is a work in process.
 ## Local testing window
 
 There is a FastAPI that serves up ProseMirror JSON.
-`uv run uvicorn main:app --reload`
+`cd doc_server && uv run uvicorn main:app --reload`
 
 And an editor that can display it
-`cd tiptap && pnpm dev`
+`cd tiptap/live_viewer && pnpm run dev`

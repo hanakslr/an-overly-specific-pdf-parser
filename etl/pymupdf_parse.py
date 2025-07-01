@@ -62,7 +62,7 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
 
     for page_num, page in enumerate(doc, start=1):
         page_items: List[Union[TextItem, ImageItem]] = []
-        blocks = page.get_text("dict", flags=pymupdf.TEXTFLAGS_TEXT)["blocks"]
+        blocks = page.get_text("dict")["blocks"]
 
         for block in blocks:
             block_type = block.get("type")
