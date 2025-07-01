@@ -1,5 +1,5 @@
 import sys
-from typing import Optional, Type
+from typing import Optional, Type, Union
 
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import MemorySaver
@@ -322,9 +322,9 @@ def build_pipeline():
     builder.add_edge("EmitBlock", "UpdateLiveEditor")
     builder.add_edge("EmitBlock", "GetNextBlock")
     builder.add_edge("InsertImages", "UpdateLiveEditor")
-    builder.add_edge("InsertImages", END)
-    # builder.add_edge("CustomNodes", "UpdateLiveEditor")
-    # builder.add_edge("CustomNodes", END)
+    builder.add_edge("InsertImages", "CustomNodes")
+    builder.add_edge("CustomNodes", "UpdateLiveEditor")
+    builder.add_edge("CustomNodes", END)
 
     return builder.compile()
 
@@ -341,8 +341,10 @@ if __name__ == "__main__":
     if resume_latest:
         state_dict = resume_from_latest(pdf_path)
         if state_dict:
+            print(f"state dict - {state_dict['blocks'][0]}")
             # Convert dictionary to PipelineState object
             initial_state = PipelineState(**state_dict)
+            print(f"initi state - {initial_state.blocks[0]}")
             update_live_editor(initial_state)
         else:
             initial_state = PipelineState(pdf_path=pdf_path)
