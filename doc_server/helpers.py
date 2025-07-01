@@ -6,7 +6,8 @@ from typing import Any, Dict, List
 
 import requests
 
-from schema.tiptap_models import DocNode, TiptapNode
+from schema.block import DocNode
+from schema.tiptap_models import TiptapNode
 
 
 def update_document(

@@ -7,7 +7,7 @@ def insert_images(state):
     in the correct positions without reordering the entire document.
     """
     print("🖼️ Inserting images...")
-    content = list(state.prose_mirror_doc.content)
+    content = list(state.blocks)
 
     # First, get the src of all existing images in the document
     existing_image_srcs = {
@@ -95,8 +95,4 @@ def insert_images(state):
             # If no spot was found, it belongs at the end
             content.append(image_node)
 
-    return {
-        "prose_mirror_doc": state.prose_mirror_doc.model_copy(
-            update={"content": content}
-        )
-    }
+    return {"blocks": content}

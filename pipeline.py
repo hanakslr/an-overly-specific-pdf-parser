@@ -6,7 +6,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, computed_field
 
-from doc_server.helpers import update_document
 from etl.llama_parse import LlamaParseOutput, parse
 from etl.pymupdf_parse import PyMuPDFOutput, extract
 from etl.zip_llama_pymupdf import (
@@ -23,7 +22,8 @@ from post_processing.insert_images import insert_images
 from post_processing.williston_extraction_schema import ExtractedData
 from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
-from schema.tiptap_models import BaseAttrs, DocNode, TiptapNode
+from schema.block import Block
+from schema.tiptap_models import BaseAttrs, TiptapNode
 
 
 class PipelineState(BaseModel):
@@ -35,8 +35,7 @@ class PipelineState(BaseModel):
 
     zipped_pages: list[ZippedOutputsPage] = None
 
-    prose_mirror_doc: DocNode = None
-    custom_nodes: list[TiptapNode] = []
+    blocks: list[Block] = []
 
     block_index: Optional[int] = -1
     page_index: Optional[int] = -1
@@ -121,13 +120,6 @@ def zip_outputs(state: PipelineState):
         pages.append(zipped_page)
 
     return {"zipped_pages": pages}
-
-
-def init_prose_mirror_doc(state: PipelineState):
-    if state.prose_mirror_doc:
-        print("⏭️  ProseMirror init already completed, skipping...")
-        return {}
-    return {"prose_mirror_doc": DocNode(content=[])}
 
 
 def get_next_block(state: PipelineState):
@@ -250,13 +242,11 @@ def emit_block(state: PipelineState):
         constructed_node.attrs.unified_block_id = state.current_block.id
 
     # Add the constructed node to the prose mirror document content
-    updated_content = state.prose_mirror_doc.content + [constructed_node]
+    updated_content = state.blocks + [constructed_node]
 
-    return {
-        "prose_mirror_doc": state.prose_mirror_doc.model_copy(
-            update={"content": updated_content}
-        )
-    }
+    print(f"Updating blocks {updated_content=}")
+
+    return {"blocks": updated_content}
 
 
 def custom_extraction_subgraph(state: PipelineState):
@@ -268,7 +258,7 @@ def custom_extraction_subgraph(state: PipelineState):
     custom_extraction_graph = build_custom_extraction_graph()
     initial_state = CustomExtractionState(
         pdf_path=state.pdf_path,
-        prose_mirror_doc=state.prose_mirror_doc,
+        blcoks=state.blocks,
         custom_extracted_data=state.custom_extracted_data,
     )
     final_state = custom_extraction_graph.invoke(initial_state)
@@ -276,17 +266,12 @@ def custom_extraction_subgraph(state: PipelineState):
 
     return {
         "custom_extracted_data": final_state_model.custom_extracted_data,
-        "prose_mirror_doc": final_state_model.prose_mirror_doc,
+        "blocks": final_state_model.blocks,
     }
 
 
 def update_live_editor(state: PipelineState):
-    if state.prose_mirror_doc:
-        print("👀  Updating live editor")
-        try:
-            update_document(state.prose_mirror_doc)
-        except Exception as e:
-            print(f"Something went wrong: {e}")
+    print("No live editor for now")
 
 
 def build_pipeline():
@@ -301,8 +286,7 @@ def build_pipeline():
     builder.add_node("ZipOutputs", RunnableLambda(zip_outputs))
     builder.add_edge("PyMuPDFExtract", "ZipOutputs")
 
-    builder.add_node("InitProseMirror", RunnableLambda(init_prose_mirror_doc))
-    builder.add_edge("ZipOutputs", "InitProseMirror")
+    builder.add_edge("ZipOutputs", "GetNextBlock")
 
     builder.add_node("UpdateLiveEditor", RunnableLambda(update_live_editor))
 
@@ -313,8 +297,6 @@ def build_pipeline():
     builder.add_node("EmitBlock", emit_block)
     builder.add_node("InsertImages", insert_images)
     builder.add_node("CustomNodes", custom_extraction_subgraph)
-
-    builder.add_edge("InitProseMirror", "GetNextBlock")
 
     builder.add_conditional_edges(
         "GetNextBlock",

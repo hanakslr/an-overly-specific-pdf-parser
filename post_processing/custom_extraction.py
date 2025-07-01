@@ -9,16 +9,15 @@ from post_processing.llama_extract import extract
 from post_processing.williston_extraction_schema import (
     ExtractedData,
 )
+from schema.block import Block
 from schema.portable_schema import FactItemBlock, GoalItemBlock
 from schema.tiptap_models import (
     BlockNode,
-    DocNode,
     HeadingNode,
     ImageheaderNode,
     ImageNode,
     ParagraphNode,
     TextNode,
-    TiptapNode,
 )
 
 load_dotenv()
@@ -27,8 +26,7 @@ load_dotenv()
 class CustomExtractionState(BaseModel):
     pdf_path: str
     custom_extracted_data: Optional[ExtractedData] = None  # ExtractedData
-    prose_mirror_doc: Optional[DocNode] = None
-    custom_nodes: List[TiptapNode] = []
+    blocks: list[Block] = []
 
 
 def split_facts(text: str) -> List[str]:
@@ -101,31 +99,26 @@ def split_facts(text: str) -> List[str]:
 
 def convert_to_prosemirror(state: CustomExtractionState):
     print(" converting custom structures to prosemirror nodes")
-    nodes = []
-
     #### Hard coding for now to see what the best flow would be
 
-    if not state.prose_mirror_doc or not state.prose_mirror_doc.content:
+    if not state.blocks:
         return {}
 
     if not state.custom_extracted_data:
         return {}
 
     ## Image header
-    content = create_image_header(state.prose_mirror_doc.content)
-    content = convert_goals(content)
-
-    prose_mirror_doc = state.prose_mirror_doc.model_copy(update={"content": content})
+    new_blocks = create_image_header(state.blocks)
+    new_blocks = convert_goals(new_blocks)
 
     return {
-        "custom_nodes": nodes,
-        "prose_mirror_doc": prose_mirror_doc,
+        "blocks": new_blocks,
     }
 
 
-def create_image_header(content: List[BlockNode]) -> List[BlockNode]:
+def create_image_header(content: List[Block]) -> List[Block]:
     """
-    Iterate through state.prose_mirror_doc.content and find 3 images in a row.
+    Iterate through content and find 3 images in a row.
     If the following element is a level 1 header, insert the ImageheaderNode after the header.
     If there's a paragraph with "[Three photographs..." text after the heading, skip it.
     Otherwise, replace the 3 images with an ImageheaderNode.
@@ -157,7 +150,7 @@ def create_image_header(content: List[BlockNode]) -> List[BlockNode]:
     return new_content
 
 
-def convert_goals(content: List[BlockNode]) -> List[BlockNode]:
+def convert_goals(content: List[Block]) -> List[Block]:
     """
     ITerate through our blocks until we find a header where content[0].text.starts with Goals: In 2050.
     Then convert the following elements into a table.

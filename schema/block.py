@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -51,3 +51,12 @@ class Block(BaseModel):
 # # Resolve forward references so that the `content` field properly recognises the
 # # `Block` type within the Union definitions.
 # Block.update_forward_refs()
+# Base class for attributes, includes unified_block_id
+class BaseAttrs(BaseModel):
+    unified_block_id: Optional[str] = None
+
+
+class DocNode(Block):
+    type: Literal["doc"] = "doc"
+    content: List[Block]
+    attrs: Optional[BaseAttrs] = None
