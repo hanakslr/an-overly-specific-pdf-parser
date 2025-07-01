@@ -369,7 +369,6 @@ if __name__ == "__main__":
             config={"memory": memory, "recursion_limit": 500},
             stream_mode="values",
         ):
-            print("check")
             final_state = state
     except Exception as e:
         print(f"Got error: {e=}")

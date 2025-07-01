@@ -160,7 +160,6 @@ def convert_goals(content: List[Block]) -> List[Block]:
     i = 0
     while i < len(content):
         block = content[i]
-        print(i)
         if block.type == "heading" and block.content[0].text.startswith(
             "Goals: In 2050"
         ):

@@ -6,7 +6,7 @@ def insert_images(state):
     After all blocks have been processed, iterate through the pages and insert images
     in the correct positions without reordering the entire document.
     """
-    print("🖼️ Inserting images...")
+    print("🖼️  Inserting images...")
     content = list(state.blocks)
 
     # First, get the src of all existing images in the document
@@ -15,6 +15,13 @@ def insert_images(state):
         for node in content
         if node.type == "image" and node.attrs and node.attrs.src
     }
+
+    image_header = [b for b in content if b.type == "imageHeader"]
+
+    if image_header:
+        image_header = image_header[0]
+        for img in image_header.content:
+            existing_image_srcs.add(img.attrs.src)
 
     # Create lookups for block information
     block_id_to_page_num = {
