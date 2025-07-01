@@ -108,7 +108,6 @@ class OrderedlistNode(Block):
 class TextNode(Block):
     type: Literal["text"] = "text"
     text: str
-    attrs: Optional[BaseAttrs] = None
 
 
 class ImageNode(Block):
