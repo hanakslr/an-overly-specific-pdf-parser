@@ -23,7 +23,7 @@ def update_document(
         Response from the server
     """
     url = f"{server_url}/api/update-doc"
-    payload = {"doc": doc.model_dump()}
+    payload = {"doc": doc.model_dump_json()}
 
     try:
         response = requests.post(url, json=payload)
@@ -48,7 +48,7 @@ def append_to_document(
     """
     url = f"{server_url}/api/append-to-doc"
 
-    payload = {"new_nodes": [c.model_dump() for c in content]}
+    payload = {"new_nodes": [c.model_dump_json() for c in content]}
 
     print(f"New content: {payload}")
 

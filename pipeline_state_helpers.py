@@ -7,6 +7,7 @@ import json
 import os
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
+from uuid import UUID
 
 from langgraph.graph.state import CompiledStateGraph
 
@@ -53,6 +54,8 @@ class DataclassJSONEncoder(json.JSONEncoder):
         # Handle Pydantic models
         if hasattr(obj, "model_dump"):
             return obj.model_dump()
+        if isinstance(obj, UUID):
+            return str(obj)
         return super().default(obj)
 
 
