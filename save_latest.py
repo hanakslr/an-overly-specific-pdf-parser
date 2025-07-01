@@ -109,6 +109,7 @@ if __name__ == "__main__":
 
             block_record = Blocks.create(
                 document=document,
+                document_index=i,
                 type=block_data.type,
                 attrs=attrs_json,
                 content=content_json,

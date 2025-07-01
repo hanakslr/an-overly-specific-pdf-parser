@@ -53,6 +53,7 @@ class Blocks(BaseModel):
     content = BinaryJSONField(null=True)
     created_at = DateTimeField(constraints=[SQL("DEFAULT now()")])
     document = ForeignKeyField(column_name="document_id", field="id", model=Documents)
+    document_index = BigIntegerField()
     id = UUIDField(constraints=[SQL("DEFAULT gen_random_uuid()")], primary_key=True)
     next_block = ForeignKeyField(
         column_name="next_block_id", field="id", model="self", null=True
