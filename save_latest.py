@@ -59,7 +59,7 @@ def dump_images(file_name: str, document_id: str):
     for image_file in image_files:
         try:
             # Construct the bucket path: images/{document_id}/{file_name}/{image_name}
-            bucket_path = f"images/{document_id}/{file_name}/{image_file.name}"
+            bucket_path = f"{document_id}/{file_name}/{image_file.name}"
 
             # Read the image file
             with open(image_file, "rb") as f:
