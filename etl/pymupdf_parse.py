@@ -1,6 +1,7 @@
 import io
 import json
 import os
+from pathlib import Path
 from typing import List, Union
 
 import pymupdf  # PyMuPDF
@@ -57,7 +58,7 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
 
     # We will store images in images/pymupdf/{pdf_path}
     # Ensure the image output directory exists
-    output_dir = f"output/images/pymupdf/{os.path.basename(pdf_path)}"
+    output_dir = f"output/images/pymupdf/{Path(pdf_path).stem}"
     os.makedirs(output_dir, exist_ok=True)
 
     for page_num, page in enumerate(doc, start=1):
