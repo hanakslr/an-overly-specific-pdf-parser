@@ -126,11 +126,17 @@ class TableNode(Block):
     content: List["TablerowNode"]
     attrs: Optional[BaseAttrs] = None
 
+    def get_text(self) -> Optional[str]:
+        return "\n".join([child.get_text() for child in self.content])
+
 
 class TablerowNode(Block):
     type: Literal["tableRow"] = "tableRow"
     content: Optional[List[Union["TablecellNode", "TableheaderNode"]]]
     attrs: Optional[BaseAttrs] = None
+
+    def get_text(self) -> Optional[str]:
+        return " | ".join([child.get_text() for child in self.content])
 
 
 class TablecellNode(Block):

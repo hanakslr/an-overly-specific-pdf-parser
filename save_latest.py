@@ -6,19 +6,19 @@ PGPASSWORD=postgres uv run -m pwiz -e postgresql -H localhost -p 54322 -u postgr
 
 """
 
+import os
 import re
 import sys
+from pathlib import Path
 
-from peewee import fn
 from dotenv import load_dotenv
+from peewee import fn
+from supabase import Client, create_client
+
 from export.models import Blocks, Collections, Documents, database
 from pipeline import PipelineState
 from pipeline_state_helpers import resume_from_latest
 from schema.tiptap_models import TiptapNode
-import os
-from supabase import create_client, Client, StorageException
-from pathlib import Path
-
 
 load_dotenv()
 
@@ -66,7 +66,7 @@ def dump_images(file_name: str, document_id: str):
                 image_data = f.read()
 
             # Upload to Supabase storage
-            result = supabase.storage.from_("images").upload(
+            supabase.storage.from_("images").upload(
                 path=bucket_path,
                 file=image_data,
                 file_options={
@@ -122,6 +122,10 @@ def update_image_src_attributes(block_data, document_id: str):
 def extract_text(node: "TiptapNode") -> str:
     """Recursively extract text from a TiptapNode."""
     # The 'text' attribute is specific to 'text' type nodes
+
+    if isinstance(node, str):
+        return node
+
     if getattr(node, "type") == "text" and hasattr(node, "text"):
         return getattr(node, "text", "") or ""
 
@@ -204,11 +208,14 @@ if __name__ == "__main__":
             update_image_src_attributes(block_data, str(document.id))
 
             attrs_json = block_data.attrs.model_dump() if block_data.attrs else None
-            content_json = (
-                [c.model_dump() for c in block_data.content]
-                if block_data.content
-                else None
-            )
+            if isinstance(block_data.content, dict):
+                content_json = block_data.content
+            else:
+                content_json = (
+                    [c.model_dump() for c in block_data.content]
+                    if block_data.content
+                    else None
+                )
 
             block_record = Blocks.create(
                 document=document,

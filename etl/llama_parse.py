@@ -5,8 +5,8 @@ Usage:  uv run parse_with_llama_parse.py input_files/chap1.pdf
 import glob
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import List
 
 from dotenv import load_dotenv

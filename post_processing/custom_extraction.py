@@ -5,17 +5,19 @@ from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel
 
+from post_processing.extract_strategies import extract_strategies
 from post_processing.llama_extract import extract
 from post_processing.williston_extraction_schema import (
     ExtractedData,
 )
 from schema.block import Block
-from schema.portable_schema import FactItemBlock, GoalItemBlock
+from schema.portable_schema import CustomBlock, FactItemBlock, GoalItemBlock
 from schema.tiptap_models import (
-    BlockNode,
     HeadingNode,
     ImageheaderNode,
     ImageNode,
+    ListitemNode,
+    OrderedlistNode,
     ParagraphNode,
     TextNode,
 )
@@ -110,10 +112,49 @@ def convert_to_prosemirror(state: CustomExtractionState):
     ## Image header
     new_blocks = create_image_header(state.blocks)
     new_blocks = convert_goals(new_blocks)
+    new_blocks = extract_osa_table(new_blocks)
+    new_blocks = citations(state, new_blocks)
 
     return {
         "blocks": new_blocks,
     }
+
+
+def citations(state: CustomExtractionState, blocks: List[Block]) -> List[Block]:
+    """
+    We extracted citations with LlamaExtract. They may be scattered everywhere, OR
+    all at the end in End Notes. Remove endnote if they exist. Add a block for citation
+    if they exist.
+    """
+    if not state.custom_extracted_data.citations:
+        return blocks
+
+    if [e for e in blocks if e.type == "orderedList" and e.attrs.type == "citations"]:
+        print("✅ Already did citations")
+        return blocks
+
+    new_content = []
+    i = 0
+
+    citation_block = CustomBlock(
+        attrs=CustomBlock.Attrs(type="citations"),
+        content={
+            "citations": [c.model_dump() for c in state.custom_extracted_data.citations]
+        },
+    )
+
+    while i < len(blocks):
+        if (
+            blocks[i].type == "heading"
+            and blocks[i].content[0].text.lower() == "end notes"
+        ):
+            new_content.append(citation_block)
+            return new_content
+
+        new_content.append(blocks[i])
+        i += 1
+    new_content.append(citation_block)
+    return new_content
 
 
 def create_image_header(content: List[Block]) -> List[Block]:
@@ -224,17 +265,74 @@ def convert_goals(content: List[Block]) -> List[Block]:
     return new_content
 
 
-def remove_osa_table_and_citations(content: List[BlockNode]) -> List[BlockNode]:
+def extract_osa_table(blocks: List[Block]) -> List[Block]:
     new_content = []
     i = 0
-    while i < len(content):
-        block = content[i]
-        if block.type == "heading" and block.content[0].text.startswith(
-            "Goals: In 2050"
+
+    while i < len(blocks):
+        block = blocks[i]
+        if (
+            block.type == "heading"
+            and block.content[0].text.lower().replace(",", "")
+            == "objectives strategies and actions"
         ):
-            pass
+            i += 1
+            objective_heading_block = blocks[i]
+
+            assert (
+                objective_heading_block.type == "heading"
+                and objective_heading_block.content[0].text == "Objectives"
+            ), "Unexpected objectives block"
+
+            objectives = []  # label, text
+
+            i += 1
+            while blocks[i].content[0].text != "Strategies":
+                # find all the objectives until we hit the strategies header
+
+                if (
+                    blocks[i].type == "heading"
+                    and re.search(r"^\d+.[A-Z]+$", blocks[i].content[0].text)
+                    and blocks[i + 1].type == "paragraph"
+                ):
+                    # found one
+                    objectives.append(
+                        {
+                            "label": blocks[i].content[0].text,
+                            "text": blocks[i + 1].content,
+                        }
+                    )
+                    i += 2
+                else:
+                    raise Exception(
+                        f"Unexpected objectives {blocks[i]} and {blocks[i + 1]}"
+                    )
+
+            i += 1
+
+            strategies_text = []
+
+            while i < len(blocks) and not (
+                blocks[i].type == "heading" and blocks[i].get_text() == "End Notes"
+            ):
+                # All of our strategies and actions.
+                # Get them together and just pass them to an LLM
+                strategies_text.append(blocks[i].get_text())
+                i += 1
+
+            # Pass the actions and strategies to an llm for categorization.
+            strategies = extract_strategies("\n".join(strategies_text))
+
+            new_content.append(
+                CustomBlock(
+                    attrs=CustomBlock.Attrs(type="actions_table"),
+                    content={"objectives": objectives, "strategies": strategies},
+                )
+            )
+
         else:
-            new_content.append(content[i])
+            new_content.append(block)
+            i += 1
 
     return new_content
 

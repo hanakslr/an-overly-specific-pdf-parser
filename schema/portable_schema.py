@@ -82,6 +82,20 @@ class ObjectiveItemBlock(Block):
     attrs: Attrs
 
 
+class CustomBlock(Block):
+    """
+    A generic custom block - whose contents are not prosemirror nodes.
+    """
+
+    type: Literal["custom"] = "custom"
+    content: dict
+
+    class Attrs(BaseModel):
+        type: str
+
+    attrs: Attrs
+
+
 BlockUnion = Union[
     GoalItemBlock,
     FactItemBlock,
@@ -96,6 +110,7 @@ BlockUnion = Union[
     OrderedlistNode,
     ParagraphNode,
     TableNode,
+    CustomBlock,
 ]
 
 # After all models are defined, rebuild the models that use forward references
