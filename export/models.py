@@ -35,7 +35,6 @@ class Collections(BaseModel):
 
 
 class BlockSchemas(BaseModel):
-    block_type = TextField()
     collection = ForeignKeyField(
         column_name="collection_id", field="id", model=Collections, null=True
     )
