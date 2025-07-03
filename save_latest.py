@@ -6,19 +6,26 @@ PGPASSWORD=postgres uv run -m pwiz -e postgresql -H localhost -p 54322 -u postgr
 
 """
 
+import importlib
+import json
 import os
+import pkgutil
 import re
 import sys
 from pathlib import Path
+from typing import Union
+from uuid import UUID
 
 from dotenv import load_dotenv
 from peewee import fn
+from pydantic import TypeAdapter
 from supabase import Client, create_client
 
-from export.models import Blocks, Collections, Documents, database
+import schema
+from export.models import Blocks, BlockSchemas, Collections, Documents, database
 from pipeline import PipelineState
 from pipeline_state_helpers import resume_from_latest
-from schema.tiptap_models import TiptapNode
+from schema.block import Block
 
 load_dotenv()
 
@@ -119,7 +126,7 @@ def update_image_src_attributes(block_data, document_id: str):
                     )
 
 
-def extract_text(node: "TiptapNode") -> str:
+def extract_text(node: "Block") -> str:
     """Recursively extract text from a TiptapNode."""
     # The 'text' attribute is specific to 'text' type nodes
 
@@ -171,6 +178,71 @@ def create_or_get_document(
         print(f"Created new document: {existing_doc.title} (ID: {existing_doc.id})")
 
     return existing_doc
+
+
+def get_all_subclasses(cls):
+    """Recursively find all subclasses of a given class."""
+    all_subclasses = []
+    for subclass in cls.__subclasses__():
+        all_subclasses.append(subclass)
+        all_subclasses.extend(get_all_subclasses(subclass))
+    return all_subclasses
+
+
+def dump_block_schema(collection_id: UUID):
+    """
+    Dump our blocks to the block_schema table so that the frontend can get types
+    """
+    try:
+        collection = Collections.get_by_id(collection_id)
+    except Collections.DoesNotExist:
+        print(f"Collection with id {collection_id} not found.")
+        return
+
+    # Dynamically import all modules in the 'schema' package to register all Block subclasses.
+    for _, module_name, _ in pkgutil.walk_packages(
+        schema.__path__, schema.__name__ + "."
+    ):
+        importlib.import_module(module_name)
+
+    # Now get all subclasses recursively
+    all_blocks = get_all_subclasses(Block)
+
+    # We only want concrete block types that have a 'type' literal.
+    block_classes = [
+        cls
+        for cls in all_blocks
+        if "type" in cls.model_fields and cls.model_fields["type"].default
+    ]
+
+    print(f"Found {len(block_classes)} block types to process.")
+
+    # Generate a single schema for a Union of all block types
+    if not block_classes:
+        return
+    union_type = Union[tuple(block_classes)]
+    adapter = TypeAdapter(union_type)
+    combined_schema = adapter.json_schema()
+
+    block_type = "combined"
+
+    # Use get_or_create to avoid duplicates for (collection, "combined")
+    block_schema_record, created = BlockSchemas.get_or_create(
+        collection=collection,
+        block_type=block_type,
+        defaults={"schema": combined_schema},
+    )
+
+    if created:
+        print("  ✅ Created combined schema for block types")
+    else:
+        # If it exists, check if the schema has changed and update it.
+        if block_schema_record.schema != combined_schema:
+            block_schema_record.schema = combined_schema
+            block_schema_record.save()
+            print("  🔄 Updated combined schema for block types")
+        else:
+            print("  👌 Combined schema is already up-to-date.")
 
 
 if __name__ == "__main__":
@@ -248,6 +320,10 @@ if __name__ == "__main__":
             prev_block_record = block_record
 
         print("✅ Done inserting blocks.")
+
+        print("🔍 Dumping block schemas...")
+        dump_block_schema(document.collection.id)
+        print("✅ Done dumping block schemas.")
 
         # Extract file name from pdf_path for image upload
         file_name = Path(pdf_path).stem

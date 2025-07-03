@@ -16,8 +16,6 @@ from schema.tiptap_models import (
     HeadingNode,
     ImageheaderNode,
     ImageNode,
-    ListitemNode,
-    OrderedlistNode,
     ParagraphNode,
     TextNode,
 )
