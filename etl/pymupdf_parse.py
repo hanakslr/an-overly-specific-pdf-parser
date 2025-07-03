@@ -104,7 +104,7 @@ def extract_structured_content(pdf_path) -> List[PageResult]:
 
                     page_items.append(
                         ImageItem(
-                            src=f"{os.path.basename(pdf_path)}/{image_name}",
+                            src=f"{Path(pdf_path).stem}/{image_name}",
                             bbox=bbox,
                             page=page_num,
                         )

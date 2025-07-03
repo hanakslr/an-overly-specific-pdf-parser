@@ -43,6 +43,7 @@ class Documents(BaseModel):
     id = UUIDField(constraints=[SQL("DEFAULT gen_random_uuid()")], primary_key=True)
     slug = TextField()
     title = TextField()
+    label = TextField()
 
     class Meta:
         table_name = "documents"

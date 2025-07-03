@@ -303,6 +303,21 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
                         }
                     )
                     i += 2
+                elif blocks[i].type == "paragraph" and re.search(
+                    r"\*\*(\d+.[A-Z])\*\*(.*?)(?:\\n|$)", blocks[i].content[0].text
+                ):
+                    text = blocks[i].content[0].text
+                    print(text)
+                    pattern = r"\*\*(\d+.[A-Z])\*\*(.*?)(?=(\n\n\*\*|\Z))"
+                    matches = re.findall(pattern, text, re.DOTALL)
+                    for match in matches:
+                        objectives.append(
+                            {
+                                "label": match[0].strip(),
+                                "text": [TextNode(text=match[1].strip())],
+                            }
+                        )
+                    i += 1
                 else:
                     raise Exception(
                         f"Unexpected objectives {blocks[i]} and {blocks[i + 1]}"

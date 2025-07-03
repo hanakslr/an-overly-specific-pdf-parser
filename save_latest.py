@@ -136,7 +136,9 @@ def extract_text(node: "TiptapNode") -> str:
     return "".join(extract_text(child) for child in node.content)
 
 
-def create_or_get_document(title: str, slug: str, collection_name: str) -> Documents:
+def create_or_get_document(
+    title: str, slug: str, collection_name: str, label: str
+) -> Documents:
     """
     Create a new document in the database, or get an existing one.
     If the document exists, its old blocks will be deleted.
@@ -148,6 +150,7 @@ def create_or_get_document(title: str, slug: str, collection_name: str) -> Docum
         title=title,
         slug=slug,
         collection=collection,
+        label=label,
         defaults={
             "collection_index": (
                 Documents.select(fn.Max(Documents.collection_index))
@@ -190,14 +193,22 @@ if __name__ == "__main__":
 
     database.connect()
     try:
-        title = re.sub(r"^\d+", "", state.blocks[0].content[0].text)
-        title = title.strip().title()
+        matches = re.match(r"^(\d+)(?:\s+\|)?\s+(.*)$", state.blocks[0].content[0].text)
 
-        slug_parts = title.split(" ")
+        title = matches.group(2)
+
+        def titlecase(s: str):
+            return " ".join(x.capitalize() for x in s.split())
+
+        title = titlecase(title.strip())
+
+        label = f"Chapter {matches.group(1)}"
+
+        slug = re.sub(r"\s", "-", title.lower())
+        slug = re.sub(r"[^a-z|-]", "", slug)
+
         document = create_or_get_document(
-            title=title,
-            slug="-".join(slug_parts[0:3]).lower(),
-            collection_name=COLLECTION_NAME,
+            title=title, slug=slug, collection_name=COLLECTION_NAME, label=label
         )
 
         prev_block_record = None
@@ -208,14 +219,17 @@ if __name__ == "__main__":
             update_image_src_attributes(block_data, str(document.id))
 
             attrs_json = block_data.attrs.model_dump() if block_data.attrs else None
-            if isinstance(block_data.content, dict):
-                content_json = block_data.content
+            if hasattr(block_data, "content"):
+                if isinstance(block_data.content, dict):
+                    content_json = block_data.content
+                else:
+                    content_json = (
+                        [c.model_dump() for c in block_data.content]
+                        if block_data.content
+                        else None
+                    )
             else:
-                content_json = (
-                    [c.model_dump() for c in block_data.content]
-                    if block_data.content
-                    else None
-                )
+                content_json = {}
 
             block_record = Blocks.create(
                 document=document,
