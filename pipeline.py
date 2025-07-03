@@ -6,7 +6,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, computed_field
 
-from doc_server.helpers import update_document
 from etl.llama_parse import LlamaParseOutput, parse
 from etl.pymupdf_parse import PyMuPDFOutput, extract
 from etl.zip_llama_pymupdf import (
@@ -23,7 +22,8 @@ from post_processing.insert_images import insert_images
 from post_processing.williston_extraction_schema import ExtractedData
 from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
-from tiptap.tiptap_models import BaseAttrs, DocNode, TiptapNode
+from schema.portable_schema import BlockUnion
+from schema.tiptap_models import BaseAttrs, TiptapNode
 
 
 class PipelineState(BaseModel):
@@ -35,8 +35,7 @@ class PipelineState(BaseModel):
 
     zipped_pages: list[ZippedOutputsPage] = None
 
-    prose_mirror_doc: DocNode = None
-    custom_nodes: list[TiptapNode] = []
+    blocks: list[BlockUnion] = []
 
     block_index: Optional[int] = -1
     page_index: Optional[int] = -1
@@ -121,13 +120,6 @@ def zip_outputs(state: PipelineState):
         pages.append(zipped_page)
 
     return {"zipped_pages": pages}
-
-
-def init_prose_mirror_doc(state: PipelineState):
-    if state.prose_mirror_doc:
-        print("⏭️  ProseMirror init already completed, skipping...")
-        return {}
-    return {"prose_mirror_doc": DocNode(content=[])}
 
 
 def get_next_block(state: PipelineState):
@@ -217,13 +209,24 @@ def emit_block(state: PipelineState):
     Construct a node using the conversion rule and add it to the prose mirror document.
     """
     print(f"✏️  Emiting node using {state.current_block.conversion_rule}")
-    # Get the conversion rule by ID
-    rule_class: Type[ConversionRule] = ConversionRuleRegistry._rules.get(
+
+    # Ensure the registry has been initialised and contains all rules. If the rule
+    # isn't found on the first attempt, trigger discovery and retry once before
+    # giving up.
+    rule_class: Type[ConversionRule] | None = ConversionRuleRegistry._rules.get(
         state.current_block.conversion_rule
     )
-    if not rule_class:
+
+    if rule_class is None:
+        # (Re-)discover rules – this is idempotent and inexpensive after the first run.
+        ConversionRuleRegistry.get_all_rules()
+        rule_class = ConversionRuleRegistry._rules.get(
+            state.current_block.conversion_rule
+        )
+
+    if rule_class is None:
         raise ValueError(
-            f"Conversion rule '{state.current_block.conversion_rule}' not found"
+            f"Conversion rule '{state.current_block.conversion_rule}' not found after registry refresh"
         )
 
     # Create an instance of the rule
@@ -250,13 +253,9 @@ def emit_block(state: PipelineState):
         constructed_node.attrs.unified_block_id = state.current_block.id
 
     # Add the constructed node to the prose mirror document content
-    updated_content = state.prose_mirror_doc.content + [constructed_node]
+    updated_content = state.blocks + [constructed_node]
 
-    return {
-        "prose_mirror_doc": state.prose_mirror_doc.model_copy(
-            update={"content": updated_content}
-        )
-    }
+    return {"blocks": updated_content}
 
 
 def custom_extraction_subgraph(state: PipelineState):
@@ -268,7 +267,7 @@ def custom_extraction_subgraph(state: PipelineState):
     custom_extraction_graph = build_custom_extraction_graph()
     initial_state = CustomExtractionState(
         pdf_path=state.pdf_path,
-        prose_mirror_doc=state.prose_mirror_doc,
+        blocks=state.blocks,
         custom_extracted_data=state.custom_extracted_data,
     )
     final_state = custom_extraction_graph.invoke(initial_state)
@@ -276,17 +275,12 @@ def custom_extraction_subgraph(state: PipelineState):
 
     return {
         "custom_extracted_data": final_state_model.custom_extracted_data,
-        "prose_mirror_doc": final_state_model.prose_mirror_doc,
+        "blocks": final_state_model.blocks,
     }
 
 
 def update_live_editor(state: PipelineState):
-    if state.prose_mirror_doc:
-        print("👀  Updating live editor")
-        try:
-            update_document(state.prose_mirror_doc)
-        except Exception as e:
-            print(f"Something went wrong: {e}")
+    print("No live editor for now")
 
 
 def build_pipeline():
@@ -301,8 +295,7 @@ def build_pipeline():
     builder.add_node("ZipOutputs", RunnableLambda(zip_outputs))
     builder.add_edge("PyMuPDFExtract", "ZipOutputs")
 
-    builder.add_node("InitProseMirror", RunnableLambda(init_prose_mirror_doc))
-    builder.add_edge("ZipOutputs", "InitProseMirror")
+    builder.add_edge("ZipOutputs", "GetNextBlock")
 
     builder.add_node("UpdateLiveEditor", RunnableLambda(update_live_editor))
 
@@ -313,8 +306,6 @@ def build_pipeline():
     builder.add_node("EmitBlock", emit_block)
     builder.add_node("InsertImages", insert_images)
     builder.add_node("CustomNodes", custom_extraction_subgraph)
-
-    builder.add_edge("InitProseMirror", "GetNextBlock")
 
     builder.add_conditional_edges(
         "GetNextBlock",
@@ -338,6 +329,11 @@ def build_pipeline():
     return builder.compile()
 
 
+# After all models and the graph are defined, rebuild the PipelineState model
+# to resolve any forward references in BlockUnion.
+PipelineState.model_rebuild()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python pipeline.py <pdf_path> [--resume-latest]")
@@ -350,8 +346,10 @@ if __name__ == "__main__":
     if resume_latest:
         state_dict = resume_from_latest(pdf_path)
         if state_dict:
+            print(f"state dict - {state_dict['blocks'][0]}")
             # Convert dictionary to PipelineState object
             initial_state = PipelineState(**state_dict)
+            print(f"initi state - {initial_state.blocks[0]}")
             update_live_editor(initial_state)
         else:
             initial_state = PipelineState(pdf_path=pdf_path)
@@ -363,24 +361,24 @@ if __name__ == "__main__":
     draw_pipeline(graph)
 
     memory = MemorySaver()
-    state = initial_state
+    final_state = None
 
     try:
-        for state_snapshot in graph.stream(
+        for state in graph.stream(
             initial_state,
             config={"memory": memory, "recursion_limit": 500},
-            stream_mode="debug",
+            stream_mode="values",
         ):
-            ## There is a state bug here. It only store the state input so
-            ## the output of the last job wont be saved.
-            payload = state_snapshot.get("payload", None)
-            if payload:
-                input = payload.get("input")
-                if input:
-                    state = input
+            final_state = state
     except Exception as e:
         print(f"Got error: {e=}")
     finally:
-        output_filename = save_output(pdf_path, state)
+        if final_state:
+            output_filename = save_output(pdf_path, final_state)
+        else:
+            print(
+                "Pipeline did not produce a final state. Saving initial state instead."
+            )
+            output_filename = save_output(pdf_path, initial_state.model_dump())
 
     print(f"✅ Pipeline complete. Output saved to: {output_filename}")

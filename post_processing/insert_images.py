@@ -1,4 +1,4 @@
-from tiptap.tiptap_models import ImageNode
+from schema.tiptap_models import ImageNode
 
 
 def insert_images(state):
@@ -6,8 +6,8 @@ def insert_images(state):
     After all blocks have been processed, iterate through the pages and insert images
     in the correct positions without reordering the entire document.
     """
-    print("🖼️ Inserting images...")
-    content = list(state.prose_mirror_doc.content)
+    print("🖼️  Inserting images...")
+    content = list(state.blocks)
 
     # First, get the src of all existing images in the document
     existing_image_srcs = {
@@ -15,6 +15,13 @@ def insert_images(state):
         for node in content
         if node.type == "image" and node.attrs and node.attrs.src
     }
+
+    image_header = [b for b in content if b.type == "imageHeader"]
+
+    if image_header:
+        image_header = image_header[0]
+        for img in image_header.content:
+            existing_image_srcs.add(img.attrs.src)
 
     # Create lookups for block information
     block_id_to_page_num = {
@@ -95,8 +102,5 @@ def insert_images(state):
             # If no spot was found, it belongs at the end
             content.append(image_node)
 
-    return {
-        "prose_mirror_doc": state.prose_mirror_doc.model_copy(
-            update={"content": content}
-        )
-    }
+    print(f"Images inserted. {len(content)} blocks total.")
+    return {"blocks": content}

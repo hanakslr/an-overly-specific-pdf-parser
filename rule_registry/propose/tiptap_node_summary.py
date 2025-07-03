@@ -2,8 +2,8 @@ from typing import ForwardRef, List, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
-import tiptap.tiptap_models as tiptap_models
-from tiptap.tiptap_models import TiptapNode
+import schema.tiptap_models as tiptap_models
+from schema.tiptap_models import TiptapNode
 
 
 # === TYPE GROUP DEFINITIONS ===

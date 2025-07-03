@@ -12,8 +12,12 @@ dependencies = [
     "langgraph>=0.4.8",
     "llama-parse>=0.6.35",
     "llmsherpa>=0.1.4",
+    "peewee>=3.18.1",
     "pillow>=11.2.1",
+    "playhouse>=0.1.0",
+    "psycopg2-binary>=2.9.10",
     "pymupdf>=1.26.1",
+    "supabase>=2.16.0",
     "uvicorn>=0.34.3",
 ]
 

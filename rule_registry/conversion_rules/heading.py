@@ -2,7 +2,7 @@ from llama_cloud_services.parse.types import PageItem
 
 from etl.pymupdf_parse import Item
 from rule_registry.conversion_rules import ConversionRule, RuleCondition
-from tiptap.tiptap_models import HeadingNode, TextNode
+from schema.tiptap_models import HeadingNode, TextNode
 
 
 class HeadingConversion(ConversionRule):

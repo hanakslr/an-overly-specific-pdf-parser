@@ -6,6 +6,7 @@ import glob
 import json
 import os
 import sys
+from pathlib import Path
 from typing import List
 
 from dotenv import load_dotenv
@@ -35,7 +36,7 @@ def parse(pdf_path: str):
         system_prompt_append="Do not include the page numbers at the bottom right of pages. Do not generate descriptions of images. Do not OCR images that are charts into real charts - if it is an image leave it an image.",
     )
     json_objs = parser.get_json_result(file_path=pdf_path)
-    image_dir = f"output/images/llamaparse/{os.path.basename(pdf_path)}"
+    image_dir = f"output/images/llamaparse/{Path(pdf_path).stem}"
 
     save_images(parser, json_objs, image_dir)
 
