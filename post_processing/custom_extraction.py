@@ -8,10 +8,17 @@ from pydantic import BaseModel
 from post_processing.extract_strategies import extract_strategies
 from post_processing.llama_extract import extract
 from post_processing.williston_extraction_schema import (
+    ActionTable,
     ExtractedData,
+    ObjectiveItem,
 )
 from schema.block import Block
-from schema.portable_schema import CustomBlock, FactItemBlock, GoalItemBlock
+from schema.portable_schema import (
+    ActionTableBlock,
+    CustomBlock,
+    FactItemBlock,
+    GoalItemBlock,
+)
 from schema.tiptap_models import (
     HeadingNode,
     ImageheaderNode,
@@ -282,7 +289,7 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
                 and objective_heading_block.content[0].text == "Objectives"
             ), "Unexpected objectives block"
 
-            objectives = []  # label, text
+            objectives: list[ObjectiveItem] = []  # label, text
 
             i += 1
             while blocks[i].content[0].text != "Strategies":
@@ -295,10 +302,10 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
                 ):
                     # found one
                     objectives.append(
-                        {
-                            "label": blocks[i].content[0].text,
-                            "text": blocks[i + 1].content,
-                        }
+                        ObjectiveItem(
+                            label=blocks[i].content[0].text,
+                            text=blocks[i + 1].content[0].text,
+                        )
                     )
                     i += 2
                 elif blocks[i].type == "paragraph" and re.search(
@@ -310,10 +317,10 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
                     matches = re.findall(pattern, text, re.DOTALL)
                     for match in matches:
                         objectives.append(
-                            {
-                                "label": match[0].strip(),
-                                "text": [TextNode(text=match[1].strip())],
-                            }
+                            ObjectiveItem(
+                                label=match[0].strip(),
+                                text=match[1].strip(),
+                            )
                         )
                     i += 1
                 else:
@@ -330,16 +337,18 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
             ):
                 # All of our strategies and actions.
                 # Get them together and just pass them to an LLM
+                print("appending strat text")
                 strategies_text.append(blocks[i].get_text())
                 i += 1
 
             # Pass the actions and strategies to an llm for categorization.
+            print("Extracting strategies w LLM")
             strategies = extract_strategies("\n".join(strategies_text))
 
+            print(f"Making new action block with:\n{strategies=}\n{objectives=}")
             new_content.append(
-                CustomBlock(
-                    attrs=CustomBlock.Attrs(type="actions_table"),
-                    content={"objectives": objectives, "strategies": strategies},
+                ActionTableBlock(
+                    content=ActionTable(strategies=strategies, objectives=objectives),
                 )
             )
 

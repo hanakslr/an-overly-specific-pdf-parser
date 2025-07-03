@@ -31,19 +31,19 @@ InlineNode = Union["HardbreakNode", "TextNode"]
 class ParagraphNode(Block):
     type: Literal["paragraph"] = "paragraph"
     content: List["InlineNode"]
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
 
 class BlockquoteNode(Block):
     type: Literal["blockquote"] = "blockquote"
     content: List["BlockNode"]
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
 
 class BulletlistNode(Block):
     type: Literal["bulletList"] = "bulletList"
     content: List["ListitemNode"]
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
 
 class CodeblockNode(Block):
@@ -53,12 +53,12 @@ class CodeblockNode(Block):
     class Attrs(BaseAttrs):
         language: Optional[str] = None
 
-    attrs: Attrs
+    attrs: Attrs = Attrs()
 
 
 class HardbreakNode(Block):
     type: Literal["hardBreak"] = "hardBreak"
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
 
 class HeadingNode(Block):
@@ -73,7 +73,7 @@ class HeadingNode(Block):
 
 class HorizontalruleNode(Block):
     type: Literal["horizontalRule"] = "horizontalRule"
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
 
 class ListitemNode(Block):
@@ -91,7 +91,7 @@ class ListitemNode(Block):
                 raise ValueError("Subsequent children must be blocks")
         return v
 
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
 
 class OrderedlistNode(Block):
@@ -102,7 +102,7 @@ class OrderedlistNode(Block):
         start: int = 1
         type: Optional[str] = None
 
-    attrs: Attrs
+    attrs: Attrs = Attrs()
 
 
 class TextNode(Block):
@@ -124,7 +124,7 @@ class ImageNode(Block):
 class TableNode(Block):
     type: Literal["table"] = "table"
     content: List["TablerowNode"]
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
     def get_text(self) -> Optional[str]:
         return "\n".join([child.get_text() for child in self.content])
@@ -133,7 +133,7 @@ class TableNode(Block):
 class TablerowNode(Block):
     type: Literal["tableRow"] = "tableRow"
     content: List[Union["TablecellNode", "TableheaderNode"]]
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None
 
     def get_text(self) -> Optional[str]:
         return " | ".join([child.get_text() for child in self.content])
@@ -148,7 +148,7 @@ class TablecellNode(Block):
         rowspan: Optional[int] = 1
         colwidth: Optional[str] = None
 
-    attrs: Attrs
+    attrs: Attrs = Attrs()
 
 
 class TableheaderNode(Block):
@@ -160,10 +160,10 @@ class TableheaderNode(Block):
         rowspan: Optional[int] = 1
         colwidth: Optional[str] = None
 
-    attrs: Attrs
+    attrs: Attrs = Attrs()
 
 
 class ImageheaderNode(Block):
     type: Literal["imageHeader"] = "imageHeader"
     content: Tuple["ImageNode", "ImageNode", "ImageNode"]
-    attrs: BaseAttrs
+    attrs: Optional[BaseAttrs] = None

@@ -1,7 +1,8 @@
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Tuple, Union
 
 from pydantic import BaseModel
 
+from post_processing.williston_extraction_schema import ActionTable
 from schema.block import Block
 from schema.tiptap_models import (
     BlockquoteNode,
@@ -48,38 +49,17 @@ class CitationBlock(Block):
     attrs: Attrs
 
 
-class ActionItemBlock(Block):
-    type: Literal["action_item"] = "action_item"
-    content: Tuple[ParagraphNode]
+class ActionTableBlock(Block):
+    type: Literal["action_table"] = "action_table"
+    content: ActionTable
 
-    class Attrs(BaseModel):
-        strategy_id: str
-        label: str
-        time_frame: Optional[str]
-        responsibility: Optional[list[str]]
-        cost: Optional[str]
+    attrs: Literal[None] = None
 
-    attrs: Attrs
-
-
-class StrategyItemBlock(Block):
-    type: Literal["strategy_item"] = "strategy_item"
-    content: Tuple[ParagraphNode]
-
-    class Attrs(BaseModel):
-        label: str
-
-    attrs: Attrs
-
-
-class ObjectiveItemBlock(Block):
-    type: Literal["objective_item"] = "objective_item"
-    content: Tuple[ParagraphNode]
-
-    class Attrs(BaseModel):
-        label: str
-
-    attrs: Attrs
+    def get_text(self):
+        """
+        Just return objectives for now. TODO: update this.
+        """
+        return "\n".join([f"{o.label}. {o.text}" for o in self.content.objectives])
 
 
 class CustomBlock(Block):
@@ -111,11 +91,11 @@ BlockUnion = Union[
     ParagraphNode,
     TableNode,
     CustomBlock,
+    ActionTableBlock,
 ]
 
 # After all models are defined, rebuild the models that use forward references
 GoalItemBlock.model_rebuild()
 FactItemBlock.model_rebuild()
 CitationBlock.model_rebuild()
-ActionItemBlock.model_rebuild()
-StrategyItemBlock.model_rebuild()
+ActionTableBlock.model_rebuild()

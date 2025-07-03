@@ -32,6 +32,11 @@ class Strategies(BaseModel):
     strategies: list[StrategyItem]
 
 
+class ActionTable(BaseModel):
+    strategies: list[StrategyItem]
+    objectives: list[ObjectiveItem]
+
+
 class CitationItem(BaseModel):
     label: str = Field(
         ...,

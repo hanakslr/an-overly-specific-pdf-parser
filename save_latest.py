@@ -18,7 +18,6 @@ from supabase import Client, create_client
 from export.models import Blocks, Collections, Documents, database
 from pipeline import PipelineState
 from pipeline_state_helpers import resume_from_latest
-from schema.block import Block
 
 load_dotenv()
 
@@ -119,23 +118,6 @@ def update_image_src_attributes(block_data, document_id: str):
                     )
 
 
-def extract_text(node: "Block") -> str:
-    """Recursively extract text from a TiptapNode."""
-    # The 'text' attribute is specific to 'text' type nodes
-
-    if isinstance(node, str):
-        return node
-
-    if getattr(node, "type") == "text" and hasattr(node, "text"):
-        return getattr(node, "text", "") or ""
-
-    # For other node types, recurse through their content
-    if not hasattr(node, "content") or not getattr(node, "content"):
-        return ""
-
-    return "".join(extract_text(child) for child in node.content)
-
-
 def create_or_get_document(
     title: str, slug: str, collection_name: str, label: str
 ) -> Documents:
@@ -222,12 +204,20 @@ if __name__ == "__main__":
             if hasattr(block_data, "content"):
                 if isinstance(block_data.content, dict):
                     content_json = block_data.content
-                else:
+                elif hasattr(block_data.content, "model_dump"):
+                    # Single Pydantic model (like ActionTable)
+                    content_json = block_data.content.model_dump()
+                elif block_data.content and hasattr(
+                    block_data.content[0], "model_dump"
+                ):
+                    # List of Pydantic models
                     content_json = (
                         [c.model_dump() for c in block_data.content]
                         if block_data.content
                         else None
                     )
+                else:
+                    content_json = block_data.content
             else:
                 content_json = {}
 
@@ -237,7 +227,7 @@ if __name__ == "__main__":
                 type=block_data.type,
                 attrs=attrs_json,
                 content=content_json,
-                text=extract_text(block_data),
+                text=block_data.get_text(),
                 prev_block=prev_block_record,
             )
 
