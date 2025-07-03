@@ -1,17 +1,31 @@
 {
   "headings": {
-    "1": {
-      "font": "BumperSticker-Regular",
-      "size": 28
-    },
-    "2": {
-      "font": "Aleo-Bold",
-      "size": 14
-    },
-    "3": {
-      "font": "BumperSticker-Regular",
-      "size": 15
-    }
+    "1": [
+      {
+        "font": "BumperSticker-Regular",
+        "size": 28
+      },
+      {
+        "font": "BumperSticker-Regular",
+        "size": 22
+      }
+    ],
+    "2": [
+      {
+        "font": "Aleo-Bold",
+        "size": 14
+      }
+    ],
+    "3": [
+      {
+        "font": "BumperSticker-Regular",
+        "size": 15
+      },
+      {
+        "font": "Aleo-Regular",
+        "size": 14
+      }
+    ]
   },
   "paragraphs": {}
 }

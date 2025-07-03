@@ -72,39 +72,59 @@ def typography_check(state):
             if not style_counts:
                 continue
 
-            dominant_style = max(style_counts, key=style_counts.get)
-            font, size = dominant_style
+            dominant_style_tuple = max(style_counts, key=style_counts.get)
+            font, size = dominant_style_tuple
+            current_style = {"font": font, "size": size}
 
             level = str(node.attrs.level)
-            expected_style = typography["headings"].get(level)
+            expected_styles = typography["headings"].get(level, [])
 
-            if expected_style and (
-                expected_style["font"] != font or expected_style["size"] != size
-            ):
-                print("\n--- POTENTIAL TYPOGRAPHY MISMATCH ---")
-                print(f'Text: "{node.content[0].text}"')
-                print(f"  - Classified as: Heading {level}")
-                print(f"  - Detected Style: font='{font}', size={size}")
+            if current_style in expected_styles:
+                continue
+
+            # Mismatch detected, try to find a matching level automatically
+            matching_levels = []
+            for lvl, styles in typography["headings"].items():
+                if current_style in styles:
+                    matching_levels.append(lvl)
+
+            if len(matching_levels) == 1:
+                new_level = matching_levels[0]
                 print(
-                    f"  - Expected Style: font='{expected_style['font']}', size={expected_style['size']}"
+                    f'INFO: Auto-reclassifying text "{node.content[0].text}" from Heading {level} to {new_level}.'
+                )
+                state.blocks[i].attrs.level = int(new_level)
+                continue
+
+            # Could not auto-resolve, prompt user
+            print("\n--- POTENTIAL TYPOGRAPHY MISMATCH ---")
+            print(f'Text: "{node.content[0].text}"')
+            print(f"  - Classified as: Heading {level}")
+            print(f"  - Detected Style: font='{font}', size={size}")
+            print(f"  - Expected Styles for Level {level}: {expected_styles}")
+
+            if matching_levels:
+                print(
+                    f"  - This style is ambiguous and matches Heading Level(s): {', '.join(matching_levels)}"
                 )
 
-                # Find potential matching levels
-                matching_levels = []
-                for lvl, style in typography["headings"].items():
-                    if style["font"] == font and style["size"] == size:
-                        matching_levels.append(lvl)
+            new_level_str = input(
+                "Enter the correct heading level, or press Enter to keep current: "
+            )
+            if new_level_str.isdigit():
+                new_level = int(new_level_str)
+                state.blocks[i].attrs.level = new_level
+                print(f"✅ Updated heading level to {new_level}.")
 
-                if matching_levels:
+                # Append the new style to the registry for the corrected level
+                level_styles = typography["headings"].get(str(new_level), [])
+                if current_style not in level_styles:
+                    level_styles.append(current_style)
+                    typography["headings"][str(new_level)] = level_styles
+                    with open("typography.json", "w") as f:
+                        json.dump(typography, f, indent=2, sort_keys=True)
                     print(
-                        f"  - This style matches Heading Level(s): {', '.join(matching_levels)}"
+                        f"✅ Added new style to Heading {new_level} in typography.json."
                     )
-
-                new_level_str = input(
-                    "Enter the correct heading level, or press Enter to keep current: "
-                )
-                if new_level_str.isdigit():
-                    state.blocks[i].attrs.level = int(new_level_str)
-                    print(f"✅ Updated heading level to {new_level_str}.")
 
     return {"blocks": state.blocks}
