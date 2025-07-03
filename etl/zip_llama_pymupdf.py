@@ -71,7 +71,8 @@ Your task is to match each item from the LlamaParse output to one or more items 
 - The items are mostly in the same order in both lists.
 - Each PyMuPDF item can only be assigned to one LlamaParse item.
 - Some LlamaParse items might not have a corresponding PyMuPDF item. In this case, pymupdf_indexes should be null or an empty list.
-- You MUST assign every PyMuPDF item to a LlamaParse item.
+- LlamaParse tends to insert new elements like OCR of pictures and tables. These won't have matching pymupdf elements.
+- You MUST assign every PyMuPDF item to a LlamaParse item. Prioritize matching on text content exactly, over meaning.
 - For each LlamaParse item you were given, you must provide a corresponding match object in your response. The `llama_index` in your response should be the index of the item in the input list, NOT the original index contained in the item object.
 
 Here are the items from LlamaParse (with their original index):

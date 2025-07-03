@@ -57,6 +57,7 @@ class Documents(BaseModel):
     label = TextField(null=True)
     slug = TextField()
     title = TextField()
+    cover_image = TextField()
 
     class Meta:
         table_name = "documents"

@@ -19,6 +19,7 @@ from post_processing.custom_extraction import (
     build_custom_extraction_graph,
 )
 from post_processing.insert_images import insert_images
+from post_processing.typography_check import typography_check
 from post_processing.williston_extraction_schema import ExtractedData
 from rule_registry.conversion_rules import ConversionRule, ConversionRuleRegistry
 from rule_registry.propose.propose_new_rule import propose_new_rule_node
@@ -233,10 +234,7 @@ def emit_block(state: PipelineState):
     rule = rule_class()
 
     # Get the PyMuPDF input (use first item if available)
-    pymupdf_input = (
-        state.current_block.fitz_items[0] if state.current_block.fitz_items else None
-    )
-
+    pymupdf_input = state.current_block.fitz_items
     # Construct the node using the rule
     constructed_node: TiptapNode = rule.construct_node(
         state.current_block.llama_item, pymupdf_input
@@ -265,6 +263,7 @@ def custom_extraction_subgraph(state: PipelineState):
     """
     print("✨ Running custom extraction subgraph")
     custom_extraction_graph = build_custom_extraction_graph()
+
     initial_state = CustomExtractionState(
         pdf_path=state.pdf_path,
         blocks=state.blocks,
@@ -306,6 +305,7 @@ def build_pipeline():
     builder.add_node("EmitBlock", emit_block)
     builder.add_node("InsertImages", insert_images)
     builder.add_node("CustomNodes", custom_extraction_subgraph)
+    builder.add_node("TypographyCheck", typography_check)
 
     builder.add_conditional_edges(
         "GetNextBlock",
@@ -323,8 +323,9 @@ def build_pipeline():
     builder.add_edge("EmitBlock", "GetNextBlock")
     builder.add_edge("InsertImages", "UpdateLiveEditor")
     builder.add_edge("InsertImages", "CustomNodes")
-    builder.add_edge("CustomNodes", "UpdateLiveEditor")
-    builder.add_edge("CustomNodes", END)
+    builder.add_edge("CustomNodes", "TypographyCheck")
+    builder.add_edge("TypographyCheck", "UpdateLiveEditor")
+    builder.add_edge("TypographyCheck", END)
 
     return builder.compile()
 
