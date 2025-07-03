@@ -34,6 +34,20 @@ class Collections(BaseModel):
         table_name = "collections"
 
 
+class BlockSchemas(BaseModel):
+    block_type = TextField()
+    collection = ForeignKeyField(
+        column_name="collection_id", field="id", model=Collections, null=True
+    )
+    created_at = DateTimeField(constraints=[SQL("DEFAULT now()")])
+    id = UUIDField(constraints=[SQL("DEFAULT gen_random_uuid()")], primary_key=True)
+    schema = BinaryJSONField()
+    updated_at = DateTimeField(constraints=[SQL("DEFAULT now()")])
+
+    class Meta:
+        table_name = "block_schemas"
+
+
 class Documents(BaseModel):
     collection = ForeignKeyField(
         column_name="collection_id", field="id", model=Collections
@@ -41,9 +55,9 @@ class Documents(BaseModel):
     collection_index = BigIntegerField()
     created_at = DateTimeField(constraints=[SQL("DEFAULT now()")])
     id = UUIDField(constraints=[SQL("DEFAULT gen_random_uuid()")], primary_key=True)
+    label = TextField(null=True)
     slug = TextField()
     title = TextField()
-    label = TextField()
 
     class Meta:
         table_name = "documents"
