@@ -1,3 +1,5 @@
+import re
+
 from schema.tiptap_models import ImageNode
 
 
@@ -101,6 +103,52 @@ def insert_images(state):
         else:
             # If no spot was found, it belongs at the end
             content.append(image_node)
+            insertion_index = len(content) - 1
+
+        # Look ahead for a markdown-style image description and remove it.
+        # We check the next few nodes to find any paragraph nodes that match the pattern.
+        indices_to_delete = []
+        lookahead_distance = 3  # Check the next 3 nodes
+
+        for i in range(1, lookahead_distance + 1):
+            check_idx = insertion_index + i
+            if check_idx >= len(content):
+                break
+
+            node = content[check_idx]
+            if node.type == "paragraph":
+                if (
+                    node.content
+                    and hasattr(node.content[0], "text")
+                    and node.content[0].text
+                ):
+                    original_text = node.content[0].text
+                    # Find and remove all markdown-style descriptions.
+                    # This handles descriptions at the start, middle, or end of text,
+                    # as well as multiple descriptions in one block.
+                    cleaned_text = re.sub(r"\[.*?\]", "", original_text).strip()
+
+                    # Check if a change was actually made
+                    if cleaned_text != original_text.strip():
+                        if not cleaned_text:
+                            # The entire text consisted of descriptions, so mark the node for deletion.
+                            if check_idx not in indices_to_delete:
+                                indices_to_delete.append(check_idx)
+                        else:
+                            # Only part of the text was a description, so update the node.
+                            print(
+                                f"INFO: Removing image description from text. Original: '{original_text.strip()}', New: '{cleaned_text}'"
+                            )
+                            node.content[0].text = cleaned_text
+
+        # Remove the nodes marked for deletion.
+        if indices_to_delete:
+            for idx in sorted(indices_to_delete, reverse=True):
+                removed_text = content[idx].content[0].text.strip()
+                print(
+                    f"INFO: Found and removed potential image description: '{removed_text}'"
+                )
+                content.pop(idx)
 
     print(f"Images inserted. {len(content)} blocks total.")
     return {"blocks": content}
