@@ -28,14 +28,34 @@ def parse(pdf_path: str):
     """
     Given an input path, parse the file with llamaparse and then return them.
     """
+    cache_dir = ".cache/llama_parse"
+    os.makedirs(cache_dir, exist_ok=True)
+
+    pdf_filename = os.path.basename(pdf_path)
+    cache_filepath = os.path.join(cache_dir, f"{pdf_filename}.json")
+
+    if os.path.exists(cache_filepath):
+        print(f"INFO: Loading cached parse results from {cache_filepath}")
+        with open(cache_filepath, "r") as f:
+            cached_data = json.load(f)
+        return LlamaParseOutput(**cached_data)
+
+    print("INFO: No cache found. Running fresh parse...")
     # Initialize the parser
     parser = LlamaParse(
         api_key=os.getenv("LLAMA_PARSE_API_KEY"),
         verbose=True,
-        premium_mode=True,
-        system_prompt_append="Do not include the page numbers at the bottom right of pages. Do not generate descriptions of images. Do not OCR images that are charts into real charts - if it is an image leave it an image.",
+        disable_ocr=True,
+        disable_image_extraction=True,
+        system_prompt_append="Do not include the page numbers at the bottom right of pages. Do not generate tables for images elements that look like charts. Ignore all images in your output.",
     )
     json_objs = parser.get_json_result(file_path=pdf_path)
+
+    # Save the raw JSON response to cache
+    with open(cache_filepath, "w") as f:
+        json.dump(json_objs[0], f, indent=2, sort_keys=True)
+    print(f"INFO: Saved parse results to {cache_filepath}")
+
     image_dir = f"output/images/llamaparse/{Path(pdf_path).stem}"
 
     save_images(parser, json_objs, image_dir)
