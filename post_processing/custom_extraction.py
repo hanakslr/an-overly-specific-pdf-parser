@@ -36,6 +36,78 @@ class CustomExtractionState(BaseModel):
     blocks: list[Block] = []
 
 
+def extract_separate_fact_paragraphs(
+    content: List[Block], start_index: int, table_name: str
+) -> tuple[bool, List[FactItemBlock], int]:
+    """
+    Try to extract facts from 6 separate paragraphs following the pattern:
+    1. CAPITALIZED HEADING
+    Body text
+    2. CAPITALIZED HEADING
+    Body text
+    3. CAPITALIZED HEADING
+    Body text
+
+    Returns:
+        tuple: (success, fact_items, blocks_consumed)
+    """
+    if start_index + 6 >= len(content):
+        return False, [], 0
+
+    # Check if we have 6 paragraphs in the expected pattern
+    fact_data = []
+
+    for j in range(3):
+        heading_idx = start_index + 1 + (j * 2)
+        body_idx = start_index + 2 + (j * 2)
+
+        if heading_idx >= len(content) or body_idx >= len(content):
+            return False, [], 0
+
+        heading_block = content[heading_idx]
+        body_block = content[body_idx]
+
+        # Check if heading block is a paragraph with numbered, capitalized content
+        if heading_block.get_text().upper() == heading_block.get_text():
+            # Check if body block is a paragraph with normal text
+            if body_block.type == "paragraph" and len(body_block.content) == 1:
+                heading_text = heading_block.content[0].text.strip()
+
+                body_text = body_block.content[0].text.strip()
+
+                fact_data.append((heading_text, body_text))
+            else:
+                return False, [], 0
+        else:
+            return False, [], 0
+
+    if len(fact_data) != 3:
+        return False, [], 0
+
+    # Create fact items from the 6 separate paragraphs
+    fact_items = []
+    for j, (heading_text, body_text) in enumerate(fact_data):
+        fact_items.append(
+            FactItemBlock(
+                attrs=FactItemBlock.Attrs(
+                    label=str(j),
+                    collection="facts"
+                    if table_name == "three things to know"
+                    else "public_engagement",
+                ),
+                content=[
+                    HeadingNode(
+                        attrs=HeadingNode.Attrs(level=3),
+                        content=[TextNode(text=heading_text)],
+                    ),
+                    ParagraphNode(content=[TextNode(text=body_text)]),
+                ],
+            )
+        )
+
+    return True, fact_items, 6  # 6 paragraphs consumed TODO - this may be off by one
+
+
 def split_facts(text: str) -> List[str]:
     """Parse an enumerated *Three Things* paragraph into individual title/body strings.
 
@@ -237,31 +309,57 @@ def convert_goals(content: List[Block]) -> List[Block]:
             table_name = block.content[0].text.lower().strip()
             n = content[i + 1]
 
-            if len(n.content) != 1 and n.type != "paragraph":
-                raise Exception(f"Expected fact content to be length 1 - got {n}")
-            res = split_facts(n.content[0].text)
+            # Try the original approach first - single paragraph that can be split
+            try:
+                if len(n.content) == 1 and n.type == "paragraph":
+                    res = split_facts(n.content[0].text)
 
-            for j in range(3):
-                title = re.sub(r"^/d+. ", "", res[j * 2])
-                new_content.append(
-                    FactItemBlock(
-                        attrs=FactItemBlock.Attrs(
-                            label=str(j),
-                            collection="facts"
-                            if table_name == "three things to know"
-                            else "public_engagement",
-                        ),
-                        content=[
-                            HeadingNode(
-                                attrs=HeadingNode.Attrs(level=3),
-                                content=[TextNode(text=title.strip())],
-                            ),
-                            ParagraphNode(content=[TextNode(text=res[(j * 2) + 1])]),
-                        ],
+                    for j in range(3):
+                        title = re.sub(r"^/d+. ", "", res[j * 2])
+                        new_content.append(
+                            FactItemBlock(
+                                attrs=FactItemBlock.Attrs(
+                                    label=str(j),
+                                    collection="facts"
+                                    if table_name == "three things to know"
+                                    else "public_engagement",
+                                ),
+                                content=[
+                                    HeadingNode(
+                                        attrs=HeadingNode.Attrs(level=3),
+                                        content=[TextNode(text=title.strip())],
+                                    ),
+                                    ParagraphNode(
+                                        content=[TextNode(text=res[(j * 2) + 1])]
+                                    ),
+                                ],
+                            )
+                        )
+
+                    i += 2
+                    continue
+                else:
+                    raise Exception(
+                        "Not a single paragraph, trying alternative approach"
                     )
+
+            except Exception:
+                # Alternative approach - try to extract from 6 separate paragraphs
+                success, fact_items, blocks_consumed = extract_separate_fact_paragraphs(
+                    content, i, table_name
                 )
 
-            i += 2
+                print(f"{success=}\n{fact_items=}\n{blocks_consumed=}")
+
+                if success:
+                    new_content.extend(fact_items)
+                    i += 1 + blocks_consumed  # Skip the heading + consumed paragraphs
+                    continue
+
+                # If neither approach worked, raise an exception
+                raise Exception(
+                    f"Could not parse Three Things section. Expected either a single paragraph that can be split, or 6 separate paragraphs in the pattern: numbered heading, body text (x3). Got: {[content[i + j].type for j in range(min(7, len(content) - i))]}"
+                )
 
         else:
             new_content.append(content[i])
@@ -309,11 +407,12 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
                     )
                     i += 2
                 elif blocks[i].type == "paragraph" and re.search(
-                    r"\*\*(\d+.[A-Z])\*\*(.*?)(?:\\n|$)", blocks[i].content[0].text
+                    r"(\*\*)?(\d+.[A-Z])(\*\*)?(.*?)(?:\\n|$)",
+                    blocks[i].content[0].text,
                 ):
                     text = blocks[i].content[0].text
                     print(text)
-                    pattern = r"\*\*(\d+.[A-Z])\*\*(.*?)(?=(\n\n\*\*|\Z))"
+                    pattern = r"(?:\*\*)?(\d+.[A-Z])(?:\*\*)?(.*?)(?=(\n\n|\Z))"
                     matches = re.findall(pattern, text, re.DOTALL)
                     for match in matches:
                         objectives.append(

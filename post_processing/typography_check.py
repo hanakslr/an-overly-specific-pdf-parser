@@ -2,7 +2,7 @@ import json
 from collections import defaultdict
 
 from etl.pymupdf_parse import TextItem
-from schema.tiptap_models import HeadingNode
+from schema.tiptap_models import HeadingNode, ParagraphNode
 
 
 def typography_check(state):
@@ -109,7 +109,7 @@ def typography_check(state):
                 )
 
             new_level_str = input(
-                "Enter the correct heading level, or press Enter to keep current: "
+                "Enter the correct heading level, `p` to correct to a paragraph, or press Enter to keep current: "
             )
             if new_level_str.isdigit():
                 new_level = int(new_level_str)
@@ -126,5 +126,7 @@ def typography_check(state):
                     print(
                         f"✅ Added new style to Heading {new_level} in typography.json."
                     )
+            elif new_level_str == "p":
+                state.blocks[i] = ParagraphNode(content=state.blocks[i].content)
 
     return {"blocks": state.blocks}
