@@ -1,0 +1,26 @@
+# Core dependencies for MinerU Pipeline
+mineru
+PyMuPDF>=1.23.0
+spacy>=3.7.0
+langchain>=0.1.0
+langchain-core>=0.1.0
+langgraph>=0.1.0
+pydantic>=2.0.0
+
+# spaCy models (install manually with: python -m spacy download en_core_web_sm)
+# en_core_web_sm
+
+# Optional dependencies
+prodigy  # For human-in-the-loop annotation (requires license)
+openai   # For LLM enhancement features
+
+# Additional utilities
+Pillow>=10.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+requests>=2.31.0
+
+# Development dependencies
+jupyter
+matplotlib
+tqdm
