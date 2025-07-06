@@ -171,15 +171,17 @@ def save_output(pdf_path):
     try:
         matches = re.match(r"^(\d+)(?:\s+\|)?\s+(.*)$", state.blocks[0].content[0].text)
 
-        title = matches.group(2)
-
         def titlecase(s: str):
             return " ".join(x.capitalize() for x in s.split())
 
+        if matches:
+            title = matches.group(2)
+            label = f"Chapter {matches.group(1)}"
+        else:
+            title = state.blocks[0].get_text()
+            label = ""
+
         title = titlecase(title.strip())
-
-        label = f"Chapter {matches.group(1)}"
-
         slug = re.sub(r"\s", "-", title.lower())
         slug = re.sub(r"[^a-z|-]", "", slug)
 
