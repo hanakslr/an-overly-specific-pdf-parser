@@ -31,7 +31,11 @@ InlineNode = Union["HardbreakNode", "TextNode"]
 class ParagraphNode(Block):
     type: Literal["paragraph"] = "paragraph"
     content: List["InlineNode"]
-    attrs: Optional[BaseAttrs] = None
+
+    class Attrs(BaseAttrs):
+        style: Optional[str] = None
+
+    attrs: Attrs = Attrs()
 
 
 class BlockquoteNode(Block):
@@ -117,6 +121,7 @@ class ImageNode(Block):
         src: str
         alt: Optional[str] = None
         title: Optional[str] = None
+        caption: Optional[str] = None
 
     attrs: Attrs
 
@@ -124,7 +129,11 @@ class ImageNode(Block):
 class TableNode(Block):
     type: Literal["table"] = "table"
     content: List["TablerowNode"]
-    attrs: Optional[BaseAttrs] = None
+
+    class Attrs(BaseAttrs):
+        caption: Optional[str] = None
+
+    attrs: Attrs = Attrs()
 
     def get_text(self) -> Optional[str]:
         return "\n".join([child.get_text() for child in self.content])

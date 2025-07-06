@@ -155,13 +155,7 @@ def create_or_get_document(
     return existing_doc
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python export/save_latest.py <pdf_path>")
-        sys.exit(1)
-
-    pdf_path = sys.argv[1]
-
+def save_output(pdf_path):
     state_dict = resume_from_latest(pdf_path)
     if not state_dict:
         print(f"No saved state found for {pdf_path}")
@@ -247,3 +241,12 @@ if __name__ == "__main__":
     finally:
         if not database.is_closed():
             database.close()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python export/save_latest.py <pdf_path>")
+        sys.exit(1)
+
+    pdf_path = sys.argv[1]
+    save_output(pdf_path)

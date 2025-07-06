@@ -335,14 +335,7 @@ def build_pipeline():
 PipelineState.model_rebuild()
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python pipeline.py <pdf_path> [--resume-latest]")
-        sys.exit(1)
-
-    pdf_path = sys.argv[1]
-    resume_latest = "--resume-latest" in sys.argv
-
+def process(pdf_path, resume_latest=False):
     # Initialize state
     if resume_latest:
         state_dict = resume_from_latest(pdf_path)
@@ -383,3 +376,13 @@ if __name__ == "__main__":
             output_filename = save_output(pdf_path, initial_state.model_dump())
 
     print(f"✅ Pipeline complete. Output saved to: {output_filename}")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python pipeline.py <pdf_path> [--resume-latest]")
+        sys.exit(1)
+
+    pdf_path = sys.argv[1]
+    resume_latest = "--resume-latest" in sys.argv
+    process(pdf_path, resume_latest)

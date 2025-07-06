@@ -45,8 +45,7 @@ def parse(pdf_path: str):
     parser = LlamaParse(
         api_key=os.getenv("LLAMA_PARSE_API_KEY"),
         verbose=True,
-        disable_ocr=True,
-        disable_image_extraction=True,
+        premium_mode=True,
         system_prompt_append="Do not include the page numbers at the bottom right of pages. Do not generate tables for images elements that look like charts. Ignore all images in your output.",
     )
     json_objs = parser.get_json_result(file_path=pdf_path)

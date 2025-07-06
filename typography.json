@@ -7,6 +7,10 @@
       },
       {
         "font": "BumperSticker-Regular",
+        "size": 26
+      },
+      {
+        "font": "BumperSticker-Regular",
         "size": 22
       }
     ],
@@ -24,6 +28,14 @@
       {
         "font": "Aleo-Regular",
         "size": 14
+      },
+      {
+        "font": "Calibri-Bold",
+        "size": 11
+      },
+      {
+        "font": "Aptos-Bold",
+        "size": 11
       }
     ]
   },
