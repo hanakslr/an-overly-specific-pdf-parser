@@ -189,7 +189,10 @@ def convert_to_prosemirror(state: CustomExtractionState):
     ## Image header
     new_blocks = create_image_header(state.blocks)
     new_blocks = convert_goals(new_blocks)
-    new_blocks = extract_osa_table(new_blocks)
+
+    if not any([e for e in new_blocks if e.type == "action_table"]):
+        new_blocks = extract_osa_table(new_blocks)
+
     new_blocks = citations(state, new_blocks)
 
     return {
@@ -206,31 +209,22 @@ def citations(state: CustomExtractionState, blocks: List[Block]) -> List[Block]:
     if not state.custom_extracted_data.citations:
         return blocks
 
-    if [e for e in blocks if e.type == "orderedList" and e.attrs.type == "citations"]:
+    if [e for e in blocks if e.type == "custom" and e.attrs.type == "citations"]:
         print("✅ Already did citations")
         return blocks
 
     new_content = []
     i = 0
 
-    citation_block = CustomBlock(
-        attrs=CustomBlock.Attrs(type="citations"),
-        content={
-            "citations": [c.model_dump() for c in state.custom_extracted_data.citations]
-        },
-    )
-
     while i < len(blocks):
         if (
             blocks[i].type == "heading"
             and blocks[i].content[0].text.lower() == "end notes"
         ):
-            new_content.append(citation_block)
             return new_content
 
         new_content.append(blocks[i])
         i += 1
-    new_content.append(citation_block)
     return new_content
 
 

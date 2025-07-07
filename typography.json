@@ -43,5 +43,18 @@
       }
     ]
   },
-  "paragraphs": {}
+  "paragraphs": {
+    "body": [
+      {
+        "font": "Aptos",
+        "size": 11
+      }
+    ],
+    "citation": [
+      {
+        "font": "Aptos",
+        "size": 6
+      }
+    ]
+  }
 }

@@ -39,16 +39,6 @@ class FactItemBlock(Block):
     attrs: Attrs
 
 
-class CitationBlock(Block):
-    type: Literal["citation"] = "citation"
-    content: Tuple[ParagraphNode]
-
-    class Attrs(BaseModel):
-        label: str
-
-    attrs: Attrs
-
-
 class ActionTableBlock(Block):
     type: Literal["action_table"] = "action_table"
     content: ActionTable
@@ -79,7 +69,6 @@ class CustomBlock(Block):
 BlockUnion = Union[
     GoalItemBlock,
     FactItemBlock,
-    CitationBlock,
     BlockquoteNode,
     BulletlistNode,
     CodeblockNode,
@@ -97,5 +86,4 @@ BlockUnion = Union[
 # After all models are defined, rebuild the models that use forward references
 GoalItemBlock.model_rebuild()
 FactItemBlock.model_rebuild()
-CitationBlock.model_rebuild()
 ActionTableBlock.model_rebuild()

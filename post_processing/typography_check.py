@@ -2,7 +2,7 @@ import json
 from collections import defaultdict
 
 from etl.pymupdf_parse import TextItem
-from schema.tiptap_models import HeadingNode, ParagraphNode
+from schema.tiptap_models import CitationNode, HeadingNode, ParagraphNode, TextNode
 
 
 def typography_check(state):
@@ -23,38 +23,6 @@ def typography_check(state):
     for page in state.zipped_pages:
         for block in page.unified_blocks:
             block_id_to_fitz_items[block.id] = block.fitz_items
-
-    # # Analyze styles of existing heading nodes
-    # heading_styles = defaultdict(lambda: defaultdict(int))
-    # for node in state.blocks:
-    #     if isinstance(node, HeadingNode):
-    #         fitz_items = block_id_to_fitz_items.get(node.attrs.unified_block_id, [])
-    #         if not fitz_items:
-    #             continue
-
-    #         style_counts = defaultdict(int)
-    #         for item in fitz_items:
-    #             if isinstance(item, TextItem):
-    #                 style = (item.font, item.size)
-    #                 style_counts[style] += len(item.text)
-
-    #         if style_counts:
-    #             dominant_style = max(style_counts, key=style_counts.get)
-    #             heading_styles[node.attrs.level][dominant_style] += 1
-
-    # # Update typography registry with the most common style for each level
-    # for level, styles in heading_styles.items():
-    #     if styles:
-    #         most_common_style = max(styles, key=styles.get)
-    #         typography["headings"][str(level)] = {
-    #             "font": most_common_style[0],
-    #             "size": most_common_style[1],
-    #         }
-
-    # # Save the updated registry
-    # with open("typography.json", "w") as f:
-    #     json.dump(typography, f, indent=2, sort_keys=True)
-    # print("✅ Typography registry updated.")
 
     # Re-check nodes against the new registry and flag inconsistencies
     for i, node in enumerate(state.blocks):
@@ -128,5 +96,78 @@ def typography_check(state):
                     )
             elif new_level_str == "p":
                 state.blocks[i] = ParagraphNode(content=state.blocks[i].content)
+        elif isinstance(node, ParagraphNode):
+            # Are there any citations?
+            # Does the unified block fitz items include any
+            fitz_items: list[TextItem] = block_id_to_fitz_items.get(
+                node.attrs.unified_block_id, []
+            )
+            if not fitz_items:
+                continue
+
+            def get_paragraph_style(font, size):
+                for style in typography["paragraphs"]:
+                    if (font, size) in [
+                        (combo["font"], combo["size"])
+                        for combo in typography["paragraphs"][style]
+                    ]:
+                        return style
+                raise Exception(f"Unexptected font style {font}, {size}")
+
+            for item in fitz_items:
+                style = get_paragraph_style(item.font, item.size)
+
+                if style == "body":
+                    continue
+                elif style == "citation":
+                    # Check to see if there is a citation block with this text. If there isn't we need to make one
+                    if [
+                        n
+                        for n in node.content
+                        if n.type == "citation" and n.attrs.label == item.text
+                    ]:
+                        print(f"Found matching citation for {item.text}")
+                    else:
+                        citation_data = [
+                            c
+                            for c in state.custom_extracted_data.citations
+                            if c.label == item.text
+                        ]
+                        if not citation_data:
+                            raise Exception(f"Could not find citation for {item.text}")
+                        citation_data = citation_data[0]
+                        citation_node = CitationNode(
+                            content=[TextNode(text=citation_data.source)],
+                            attrs=CitationNode.Attrs(label=item.text),
+                        )
+
+                        # Find where to put it.
+                        new_children = []
+                        for child_node in node.content:
+                            # Can either be superscript OR just the number
+                            if (
+                                child_node.type == "text"
+                                and f"<sup>{item.text}</sup>" in child_node.text
+                            ):
+                                parts = child_node.text.split(f"<sup>{item.text}</sup>")
+
+                                if len(parts) != 2:
+                                    raise Exception(
+                                        f"Unexpected text format for citation, found {parts=}"
+                                    )
+
+                                new_children.extend(
+                                    [
+                                        TextNode(text=parts[0]),
+                                        citation_node,
+                                        TextNode(text=parts[1]),
+                                    ]
+                                )
+                            else:
+                                new_children.append(child_node)
+                        print("Setting new children w citation")
+                        node.content = new_children
+                else:
+                    raise Exception(f"Unexpected style: {style}")
 
     return {"blocks": state.blocks}

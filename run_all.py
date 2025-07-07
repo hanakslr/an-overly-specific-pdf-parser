@@ -6,7 +6,7 @@ import os
 import sys
 
 from pipeline import process
-from save_latest import save_output
+from pipeline_state_helpers import save_output
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -21,5 +21,5 @@ if __name__ == "__main__":
         file_path = os.path.join(input_dir, filename)
         if os.path.isfile(file_path) and filename.lower().endswith(".pdf"):
             print(f"Processing file: {file_path}")
-            process(file_path, False)
+            process(file_path, resume_latest)
             save_output(file_path)

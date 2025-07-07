@@ -6,6 +6,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, computed_field
 
+from cache_helpers import load_from_cache, save_to_cache
 from etl.llama_parse import LlamaParseOutput, parse
 from etl.pymupdf_parse import PyMuPDFOutput, extract
 from etl.zip_llama_pymupdf import (
@@ -88,11 +89,21 @@ def pymupdf_extract(state: PipelineState):
         print("⏭️  PyMuPDF extraction already completed, skipping...")
         return {}
 
+    # Try to load from cache first
+    cached_output = load_from_cache(state.pdf_path, "pymupdf_extract")
+    if cached_output:
+        print("📋 Using cached PyMuPDF extraction...")
+        return {"pymupdf_output": cached_output}
+
     print("🔄 Running PyMuPDF extraction...")
     result = extract(state.pdf_path)
     # Convert the list of PageResult objects to PyMuPDFOutput
     # The extract function returns a list, but we expect a PyMuPDFOutput with pages field
     pymupdf_output = PyMuPDFOutput(pages=result)
+
+    # Save to cache
+    save_to_cache(state.pdf_path, "pymupdf_extract", pymupdf_output)
+
     return {"pymupdf_output": pymupdf_output}
 
 
@@ -103,6 +114,12 @@ def zip_outputs(state: PipelineState):
     if state.zipped_pages:
         print("⏭️  Zipping pages already completed, skipping...")
         return {}
+
+    # Try to load from cache first
+    cached_pages = load_from_cache(state.pdf_path, "zip_outputs")
+    if cached_pages:
+        print("📋 Using cached zipped pages...")
+        return {"zipped_pages": cached_pages}
 
     print("🧹  Zipping pages")
 
@@ -119,6 +136,9 @@ def zip_outputs(state: PipelineState):
             unified_blocks=match_pages(lp_page, pm_page),
         )
         pages.append(zipped_page)
+
+    # Save to cache
+    save_to_cache(state.pdf_path, "zip_outputs", pages)
 
     return {"zipped_pages": pages}
 
