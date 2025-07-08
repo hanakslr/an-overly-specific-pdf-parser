@@ -179,7 +179,7 @@ class TableheaderNode(Block):
     content: List["BlockNode"]
 
     class Attrs(BaseAttrs):
-        colspan: Optional[int] = 1
+        colspan: Optional[int] = None
         rowspan: Optional[int] = 1
         colwidth: Optional[str] = None
 
@@ -188,5 +188,5 @@ class TableheaderNode(Block):
 
 class ImageheaderNode(Block):
     type: Literal["imageHeader"] = "imageHeader"
-    content: Tuple["ImageNode", "ImageNode", "ImageNode"]
+    content: List["ImageNode"]
     attrs: Optional[BaseAttrs] = None

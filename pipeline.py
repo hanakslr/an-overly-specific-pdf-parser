@@ -385,7 +385,11 @@ def process(pdf_path, resume_latest=False):
         ):
             final_state = state
     except Exception as e:
+        import traceback
+
         print(f"Got error: {e=}")
+        print("Full traceback:")
+        traceback.print_exc()
     finally:
         if final_state:
             output_filename = save_output(pdf_path, final_state)

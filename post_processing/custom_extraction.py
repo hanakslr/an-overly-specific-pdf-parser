@@ -138,10 +138,11 @@ def split_facts(text: str) -> List[str]:
 
     # Pattern to capture an item number followed by a heading (everything up to the
     # end of that line).
+    print(f"Chekcing: {text=}")
     item_pattern = re.compile(r"(^|\n)\s*(\d+)\.\s+([^\n]+)", re.MULTILINE)
 
     matches = list(item_pattern.finditer(text))
-
+    print(matches)
     if len(matches) != 3:
         raise Exception(
             f"Expected to find exactly 3 numbered headings, found {len(matches)}.\n"
@@ -189,6 +190,7 @@ def convert_to_prosemirror(state: CustomExtractionState):
     ## Image header
     new_blocks = create_image_header(state.blocks)
     new_blocks = convert_goals(new_blocks)
+    print("done converting goals")
 
     if not any([e for e in new_blocks if e.type == "action_table"]):
         new_blocks = extract_osa_table(new_blocks)
@@ -247,15 +249,17 @@ def create_image_header(content: List[Block]) -> List[Block]:
             i + 2 < len(content)
             and isinstance(content[i], ImageNode)
             and isinstance(content[i + 1], ImageNode)
-            and isinstance(content[i + 2], ImageNode)
         ):
             image1 = content[i]
             image2 = content[i + 1]
-            image3 = content[i + 2]
-            image_header = ImageheaderNode(content=(image1, image2, image3))
+            header_content = [image1, image2]
+            if isinstance(content[i + 2], ImageNode):
+                header_content.append(content[i + 2])
+
+            image_header = ImageheaderNode(content=header_content)
 
             new_content.append(image_header)
-            i += 3
+            i += len(header_content)
         else:
             new_content.append(content[i])
             i += 1
@@ -272,7 +276,7 @@ def convert_goals(content: List[Block]) -> List[Block]:
     i = 0
     while i < len(content):
         block = content[i]
-        if block.type == "heading" and block.content[0].text.startswith(
+        if block.type == "heading" and block.content[0].get_text().startswith(
             "Goals: In 2050"
         ):
             goal_items = []
@@ -297,10 +301,10 @@ def convert_goals(content: List[Block]) -> List[Block]:
             new_content.extend(goal_items)
             i += 7
 
-        elif block.type == "heading" and block.content[0].text.startswith(
+        elif block.type == "heading" and block.content[0].get_text().startswith(
             "Three Things"
         ):
-            table_name = block.content[0].text.lower().strip()
+            table_name = block.content[0].get_text().lower().strip()
             n = content[i + 1]
 
             # Try the original approach first - single paragraph that can be split
@@ -352,7 +356,7 @@ def convert_goals(content: List[Block]) -> List[Block]:
 
                 # If neither approach worked, raise an exception
                 raise Exception(
-                    f"Could not parse Three Things section. Expected either a single paragraph that can be split, or 6 separate paragraphs in the pattern: numbered heading, body text (x3). Got: {[content[i + j].type for j in range(min(7, len(content) - i))]}"
+                    f"Could not parse Three Things section. Expected either a single paragraph that can be split, or 6 separate paragraphs in the pattern: numbered heading, body text (x3). Got: {[content[i + j] for j in range(min(7, len(content) - i))]}"
                 )
 
         else:
@@ -366,8 +370,11 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
     new_content = []
     i = 0
 
+    print("Extracting osa table")
+
     while i < len(blocks):
         block = blocks[i]
+        print(f"Checking {block=}")
         if (
             block.type == "heading"
             and block.content[0].text.lower().replace(",", "")
@@ -378,33 +385,38 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
 
             assert (
                 objective_heading_block.type == "heading"
-                and objective_heading_block.content[0].text == "Objectives"
+                and objective_heading_block.content[0].get_text() == "Objectives"
             ), "Unexpected objectives block"
+
+            print("found objectives heading")
 
             objectives: list[ObjectiveItem] = []  # label, text
 
             i += 1
-            while blocks[i].content[0].text != "Strategies":
+            while (
+                hasattr(blocks[i], "content")
+                and blocks[i].content[0].get_text() != "Strategies"
+            ):
                 # find all the objectives until we hit the strategies header
-
+                print(f"Checking {i}: {blocks[i]}")
                 if (
                     blocks[i].type == "heading"
-                    and re.search(r"^\d+.[A-Z]+$", blocks[i].content[0].text)
+                    and re.search(r"^\d+.[A-Z]+$", blocks[i].content[0].get_text())
                     and blocks[i + 1].type == "paragraph"
                 ):
                     # found one
                     objectives.append(
                         ObjectiveItem(
-                            label=blocks[i].content[0].text,
-                            text=blocks[i + 1].content[0].text,
+                            label=blocks[i].content[0].get_text(),
+                            text=blocks[i + 1].content[0].get_text(),
                         )
                     )
                     i += 2
                 elif blocks[i].type == "paragraph" and re.search(
                     r"(\*\*)?(\d+.[A-Z])(\*\*)?(.*?)(?:\\n|$)",
-                    blocks[i].content[0].text,
+                    blocks[i].content[0].get_text(),
                 ):
-                    text = blocks[i].content[0].text
+                    text = blocks[i].content[0].get_text()
                     print(text)
                     pattern = r"(?:\*\*)?(\d+.[A-Z])(?:\*\*)?(.*?)(?=(\n\n|\Z))"
                     matches = re.findall(pattern, text, re.DOTALL)
@@ -416,11 +428,32 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
                             )
                         )
                     i += 1
+                elif blocks[i].type == "table":
+                    for row in blocks[i].content:
+                        print(f"\nChecking row: {row}")
+                        if len(row.content) == 2:
+                            cell1 = row.content[0].get_text()
+                            cell2 = row.content[1].get_text()
+
+                            print(f"{cell1=}, {cell2=}")
+                            if cell1 == "Objective" and cell2 == "Description":
+                                continue
+
+                            objectives.append(
+                                ObjectiveItem(
+                                    label=cell1.strip(),
+                                    text=cell2.strip(),
+                                )
+                            )
+                        else:
+                            raise Exception(f"Unexpected: {row}")
+                    i += 1
+
                 else:
                     raise Exception(
                         f"Unexpected objectives {blocks[i]} and {blocks[i + 1]}"
                     )
-
+            print(f"Got objectives: {objectives}")
             i += 1
 
             strategies_text = []

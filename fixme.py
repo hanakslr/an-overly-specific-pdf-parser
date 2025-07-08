@@ -127,8 +127,8 @@ def merge_blocks(document: Documents, block_index: int, second_block_index) -> b
     if first_block.type == "paragraph":
         first_block.text = first_block.text + " " + second_block.text
         # Find the first text block in second_block. If it doens't begin with a space insert one.
-        first_text_node = next(n for n in second_block.content if n.type == "text")
-        first_text_node.text = f" {first_text_node}"
+        first_text_node = next(n for n in second_block.content if n["type"] == "text")
+        first_text_node["text"] = f" {first_text_node['text']}"
         first_block.content.extend(second_block.content)
 
         first_block.save()
@@ -165,6 +165,122 @@ def add_table_header_to_block(document: Documents, block_index: int) -> bool:
             return False
     except Exception as e:
         print(f"Error inserting header: {e}")
+        return False
+
+
+def make_image_header(document: Documents) -> bool:
+    """
+    Find the first up to 3 consecutive image blocks and convert them to an imageHeader block.
+    """
+    try:
+        # Get all image blocks ordered by document_index
+        image_blocks = (
+            Blocks.select()
+            .where((Blocks.document == document) & (Blocks.type == "image"))
+            .order_by(Blocks.document_index)
+        ).execute()
+
+        if not image_blocks:
+            print("❌ No image blocks found in document")
+            return False
+
+        # Find the first consecutive sequence of up to 3 image blocks
+        consecutive_images = []
+        current_sequence = []
+
+        for block in image_blocks:
+            if not current_sequence:
+                # Start a new sequence
+                current_sequence = [block]
+            elif block.document_index == current_sequence[-1].document_index + 1:
+                # This block is consecutive
+                current_sequence.append(block)
+                if len(current_sequence) >= 3:
+                    # We have our 3 consecutive blocks
+                    consecutive_images = current_sequence
+                    break
+            else:
+                # Non-consecutive, start over
+                current_sequence = [block]
+
+        # If we didn't find 3 consecutive, use what we have
+        if not consecutive_images and current_sequence:
+            consecutive_images = current_sequence
+
+        if not consecutive_images:
+            print("❌ No consecutive image blocks found")
+            return False
+
+        print(f"📸 Found {len(consecutive_images)} consecutive image blocks:")
+        for i, block in enumerate(consecutive_images):
+            print(
+                f"  {i + 1}. Block {block.document_index}: {block.attrs.get('src', 'No src') if block.attrs else 'No attrs'}"
+            )
+
+        # Confirm with user
+        confirm = (
+            input(
+                f"\nCreate image header from these {len(consecutive_images)} images? (y/N): "
+            )
+            .strip()
+            .lower()
+        )
+        if confirm not in ["y", "yes"]:
+            print("❌ Image header creation cancelled")
+            return False
+
+        # Get the first image block and its neighbors
+        first_image = consecutive_images[0]
+        prev_block = first_image.prev_block
+        next_block = consecutive_images[-1].next_block
+
+        # Create imageHeader content with up to 3 images
+        image_header_content = []
+        for i in range(3):
+            if i < len(consecutive_images):
+                image_header_content.append(consecutive_images[i])
+
+        # Create the imageHeader block
+        image_header_block = Blocks(
+            document=document,
+            type="imageHeader",
+            content=image_header_content,
+            document_index=first_image.document_index,
+            prev_block=prev_block,
+            next_block=next_block,
+        )
+
+        # Update linked list connections
+        if prev_block:
+            prev_block.next_block = image_header_block
+            prev_block.save()
+
+        if next_block:
+            next_block.prev_block = image_header_block
+            next_block.save()
+
+        # Save the imageHeader block
+        image_header_block.save()
+
+        # Delete the original image blocks
+        for image_block in consecutive_images:
+            image_block.delete_instance()
+
+        # Update document_index for all subsequent blocks
+        Blocks.update(
+            document_index=Blocks.document_index - len(consecutive_images) + 1
+        ).where(
+            (Blocks.document == document)
+            & (Blocks.document_index > first_image.document_index)
+        ).execute()
+
+        print(
+            f"✅ Successfully created image header from {len(consecutive_images)} images"
+        )
+        return True
+
+    except Exception as e:
+        print(f"❌ Error creating image header: {e}")
         return False
 
 
@@ -245,6 +361,7 @@ def show_menu():
     print("2. Add caption to image or table")
     print("3. Add table header to table")
     print("4. Merge blocks")
+    print("5. Make image header")
     print("0. Exit")
     print("=" * 30)
 
@@ -339,7 +456,9 @@ def main():
 
                 if merge_blocks(document, block_index, second_block_index):
                     blocks = list_blocks(document)
-
+            elif choice == "5":
+                if make_image_header(document):
+                    blocks = list_blocks(document)
             else:
                 print("❌ Invalid choice. Please enter a number between 0-4")
 

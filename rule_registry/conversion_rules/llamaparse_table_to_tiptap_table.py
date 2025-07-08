@@ -24,6 +24,8 @@ class LlamaparseTableToTiptapTableConversion(ConversionRule):
     ) -> TableNode:
         rows = []
         for row in llamaparse_input.rows:
+            print(row)
+
             cells = [
                 TablecellNode(
                     content=[ParagraphNode(content=[TextNode(text=cell or " ")])]
@@ -31,4 +33,5 @@ class LlamaparseTableToTiptapTableConversion(ConversionRule):
                 for cell in row
             ]
             rows.append(TablerowNode(content=cells))
+
         return TableNode(content=rows)
