@@ -152,7 +152,7 @@ def split_facts(text: str) -> List[str]:
 
     for idx, match in enumerate(matches):
         # Extract the heading (without the leading number and dot)
-        heading = match.group(3).strip()
+        heading = match.group(3).strip("#").strip()
 
         # Everything after the heading until the start of the next numbered heading
         # (or end of the text for the last item) is the body.

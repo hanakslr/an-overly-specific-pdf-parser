@@ -1,8 +1,35 @@
 import json
 from collections import defaultdict
+import re
 
 from etl.pymupdf_parse import TextItem
 from schema.tiptap_models import CitationNode, HeadingNode, ParagraphNode, TextNode
+
+SUPERSCRIPT_MAP = {
+    "¹": "1",
+    "²": "2",
+    "³": "3",
+    "⁴": "4",
+    "⁵": "5",
+    "⁶": "6",
+    "⁷": "7",
+    "⁸": "8",
+    "⁹": "9",
+    "⁰": "0",
+}
+
+
+def citation_node_for_label(state, label):
+    citation_data = [
+        c for c in state.custom_extracted_data.citations if c.label == label
+    ]
+    if not citation_data:
+        raise Exception(f"Could not find citation for {label}")
+    citation_data = citation_data[0]
+    return CitationNode(
+        content=[TextNode(text=citation_data.source)],
+        attrs=CitationNode.Attrs(label=label),
+    )
 
 
 def typography_check(state):
@@ -99,6 +126,39 @@ def typography_check(state):
         elif isinstance(node, ParagraphNode):
             # Are there any citations?
             # Does the unified block fitz items include any
+
+            ## Through regex unicode chars
+            if re.search(r"[¹²³⁴⁵⁶⁷⁸⁹⁰]+", node.get_text()):
+                new_content = []
+                for child in node.content:
+                    if child.type != "text":
+                        new_content.append(child)
+                        continue
+
+                    matches = re.findall(r"[¹²³⁴⁵⁶⁷⁸⁹⁰]+", child.text)
+
+                    if matches:
+                        remaining = child.text
+                        print(f"MATCHES {matches=}")
+                        for match in matches:
+                            parts = remaining.split(match, 1)
+                            new_content.append(TextNode(text=parts[0]))
+                            new_content.append(
+                                citation_node_for_label(
+                                    state,
+                                    "".join([SUPERSCRIPT_MAP[char] for char in match]),
+                                )
+                            )
+                            print(f"Remaining {parts[1]}")
+                            remaining = parts[1]
+                        if remaining:
+                            new_content.append(TextNode(text=remaining))
+                    else:
+                        new_content.append(child)
+
+                node.content = new_content
+
+            ## Through <sup> and text styles
             fitz_items: list[TextItem] = block_id_to_fitz_items.get(
                 node.attrs.unified_block_id, []
             )
@@ -168,6 +228,10 @@ def typography_check(state):
                         print("Setting new children w citation")
                         node.content = new_children
                 else:
-                    raise Exception(f"Unexpected style: {style}")
+                    continue
+                    # # Find the node in content that contains this content
+                    # for child_node in node.content:
+                    #     if item.text in child_node.
+                    # raise Exception(f"Unexpected style: {style}")
 
     return {"blocks": state.blocks}

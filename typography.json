@@ -55,6 +55,7 @@
         "font": "Aptos",
         "size": 6
       }
-    ]
+    ],
+    "italic": [{ "font": "Aptos-Italic", "size": 11 }]
   }
 }

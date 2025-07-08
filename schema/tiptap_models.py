@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple, Union
 
-from pydantic import validator
+from pydantic import validator, BaseModel
 from typing_extensions import Literal
 
 from schema.block import BaseAttrs, Block
@@ -111,6 +111,11 @@ class OrderedlistNode(Block):
 class TextNode(Block):
     type: Literal["text"] = "text"
     text: str
+
+    class Attrs(BaseModel):
+        style: Optional[str] = None
+
+    attrs: Attrs = Attrs()
 
 
 class CitationNode(Block):
