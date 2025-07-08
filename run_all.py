@@ -6,7 +6,7 @@ import os
 import sys
 
 from pipeline import process
-from pipeline_state_helpers import save_output
+from save_latest import save_output
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

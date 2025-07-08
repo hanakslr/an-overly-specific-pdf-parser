@@ -172,7 +172,7 @@ def typography_check(state):
                         for combo in typography["paragraphs"][style]
                     ]:
                         return style
-                raise Exception(f"Unexptected font style {font}, {size}")
+                # raise Exception(f"Unexptected font style {font}, {size}")
 
             for item in fitz_items:
                 style = get_paragraph_style(item.font, item.size)

@@ -14,6 +14,7 @@ from peewee import fn
 from supabase import Client, create_client
 
 from export.models import Blocks, Collections, Documents, database
+from schema.tiptap_models import ParagraphNode, TableheaderNode, TablerowNode, TextNode
 
 # Load environment variables
 load_dotenv()
@@ -68,7 +69,7 @@ def list_blocks(document: Documents):
     List all blocks in the document with their index and type.
     """
     try:
-        database.connect()
+        database.connect(reuse_if_open=True)
 
         blocks = (
             Blocks.select()
@@ -93,9 +94,97 @@ def list_blocks(document: Documents):
     except Exception as e:
         print(f"❌ Error listing blocks: {e}")
         return []
-    finally:
-        if not database.is_closed():
-            database.close()
+
+
+def get_db_block(document: Documents, block_index: int):
+    block = (
+        Blocks.select()
+        .where((Blocks.document == document) & (Blocks.document_index == block_index))
+        .first()
+    )
+
+    if not block:
+        print(f"❌ No block found with index {block_index}")
+        return None
+
+    return block
+
+
+def merge_blocks(document: Documents, block_index: int, second_block_index) -> bool:
+    first_block = get_db_block(document, block_index)
+    second_block = get_db_block(document, second_block_index)
+
+    if not first_block or not second_block:
+        print("Block not found")
+        return False
+
+    if first_block.type != second_block.type:
+        print(
+            f"Blocks are mismatched types: {first_block.type} and {second_block.type}"
+        )
+        return False
+
+    if first_block.type == "paragraph":
+        first_block.text = first_block.text + " " + second_block.text
+        # Find the first text block in second_block. If it doens't begin with a space insert one.
+        first_text_node = next(n for n in second_block.content if n.type == "text")
+        first_text_node.text = f" {first_text_node}"
+        first_block.content.extend(second_block.content)
+
+        first_block.save()
+        delete_block_by_index(document, second_block_index)
+        return True
+    else:
+        print(f"Unhandled block type {first_block.type}")
+    return False
+
+
+def add_table_header_to_block(document: Documents, block_index: int) -> bool:
+    try:
+        block = get_db_block(document, block_index)
+        header_text = input("Enter title for table: ").strip()
+        colspan = input("Enter colspan: ").strip()
+
+        header_row = TablerowNode(
+            content=[
+                TableheaderNode(
+                    content=[ParagraphNode(content=[TextNode(text=header_text)])],
+                    attrs=TableheaderNode.Attrs(colspan=int(colspan)),
+                )
+            ]
+        )
+
+        block.content.insert(0, header_row.model_dump())
+        print(block.content)
+        good = input("looks good? (y/n)")
+
+        if good == "y":
+            block.save()
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(f"Error inserting header: {e}")
+        return False
+
+
+def add_caption_to_block(document: Documents, block_index: int) -> bool:
+    try:
+        block = get_db_block(document, block_index)
+        block.attrs = block.attrs or {}
+
+        if block.attrs["caption"]:
+            print(f"Block has caption: {block.attrs['caption']}")
+
+        choice = input("Enter caption for block: ").strip()
+
+        block.attrs["caption"] = choice
+        block.save()
+
+        return True
+    except Exception as e:
+        print(f"Error deleting block: {e}")
+        return False
 
 
 def delete_block_by_index(document: Documents, block_index: int) -> bool:
@@ -103,19 +192,10 @@ def delete_block_by_index(document: Documents, block_index: int) -> bool:
     Delete a block by its document_index.
     """
     try:
-        database.connect()
-
         # Find the block to delete
-        block_to_delete = (
-            Blocks.select()
-            .where(
-                (Blocks.document == document) & (Blocks.document_index == block_index)
-            )
-            .first()
-        )
+        block_to_delete = get_db_block(document, block_index)
 
         if not block_to_delete:
-            print(f"❌ No block found with index {block_index}")
             return False
 
         # Get the previous and next blocks
@@ -153,9 +233,6 @@ def delete_block_by_index(document: Documents, block_index: int) -> bool:
     except Exception as e:
         print(f"❌ Error deleting block: {e}")
         return False
-    finally:
-        if not database.is_closed():
-            database.close()
 
 
 def show_menu():
@@ -165,11 +242,21 @@ def show_menu():
     print("\n🔧 Block Correction Menu")
     print("=" * 30)
     print("1. Delete a block by document_index")
-    print("2. [Future: Edit block content]")
-    print("3. [Future: Insert new block]")
-    print("4. [Future: Reorder blocks]")
+    print("2. Add caption to image or table")
+    print("3. Add table header to table")
+    print("4. Merge blocks")
     print("0. Exit")
     print("=" * 30)
+
+
+def get_block_index_from_user(blocks):
+    block_index = int(input("Enter the document_index of the block: "))
+
+    # Validate the index exists
+    if not any(block.document_index == block_index for block in blocks):
+        print(f"❌ No block found with index {block_index}")
+        return None
+    return block_index
 
 
 def main():
@@ -197,6 +284,7 @@ def main():
         show_menu()
 
         try:
+            database.connect(reuse_if_open=True)
             choice = input("Enter your choice (0-4): ").strip()
 
             if choice == "0":
@@ -205,13 +293,9 @@ def main():
             elif choice == "1":
                 # Delete block by index
                 try:
-                    block_index = int(
-                        input("Enter the document_index of the block to delete: ")
-                    )
+                    block_index = get_block_index_from_user(blocks)
 
-                    # Validate the index exists
-                    if not any(block.document_index == block_index for block in blocks):
-                        print(f"❌ No block found with index {block_index}")
+                    if not block_index:
                         continue
 
                     # Confirm deletion
@@ -231,9 +315,30 @@ def main():
 
                 except ValueError:
                     print("❌ Please enter a valid number")
+            elif choice == "2":
+                block_index = get_block_index_from_user(blocks)
+                if not block_index:
+                    continue
 
-            elif choice in ["2", "3", "4"]:
-                print("🚧 This option is not yet implemented")
+                if add_caption_to_block(document, block_index):
+                    blocks = list_blocks(document)
+            elif choice == "3":
+                block_index = get_block_index_from_user(blocks)
+                if not block_index:
+                    continue
+                if add_table_header_to_block(document, block_index):
+                    blocks = list_blocks(document)
+            elif choice == "4":
+                print("First block: ")
+                block_index = get_block_index_from_user(blocks)
+                print("Second block")
+                second_block_index = get_block_index_from_user(blocks)
+
+                if not block_index or not second_block_index:
+                    continue
+
+                if merge_blocks(document, block_index, second_block_index):
+                    blocks = list_blocks(document)
 
             else:
                 print("❌ Invalid choice. Please enter a number between 0-4")
@@ -244,6 +349,9 @@ def main():
         except EOFError:
             print("\n👋 Goodbye!")
             break
+        finally:
+            if not database.is_closed():
+                database.close()
 
 
 if __name__ == "__main__":
