@@ -51,42 +51,93 @@ def extract_separate_fact_paragraphs(
     Returns:
         tuple: (success, fact_items, blocks_consumed)
     """
-    if start_index + 6 >= len(content):
-        return False, [], 0
-
     # Check if we have 6 paragraphs in the expected pattern
-    fact_data = []
+    potential_facts_content = []
+    blocks_to_move = []
 
-    for j in range(3):
-        heading_idx = start_index + 1 + (j * 2)
-        body_idx = start_index + 2 + (j * 2)
+    # Iterate through content starting at i until you find a forth header like thing
+    i = start_index + 1
+    print(f"\n\n{i=}. {table_name=}")
 
-        if heading_idx >= len(content) or body_idx >= len(content):
-            return False, [], 0
+    def has_header(block: Block) -> int:
+        print(f"Has headers? {block.type}: {block.get_text()}")
+        if block.type == "heading":
+            return 1
+        if block.type == "paragraph" and block.get_text().upper() == block.get_text():
+            return 1
+        if block.type == "paragraph" and re.match(r"^(\d+)", block.get_text()):
+            item_pattern = re.compile(r"(^|\n)\s*(\d+)\.\s+([^\n]+)", re.MULTILINE)
+            matches = list(item_pattern.finditer(block.get_text()))
+            return len(matches)
+        return 0
 
-        heading_block = content[heading_idx]
-        body_block = content[body_idx]
-
-        # Check if heading block is a paragraph with numbered, capitalized content
-        if heading_block.get_text().upper() == heading_block.get_text():
-            # Check if body block is a paragraph with normal text
-            if body_block.type == "paragraph" and len(body_block.content) == 1:
-                heading_text = heading_block.content[0].text.strip()
-
-                body_text = body_block.content[0].text.strip()
-
-                fact_data.append((heading_text, body_text))
+    header_count = 0
+    while i < len(content):
+        headers = has_header(content[i])
+        print(headers)
+        if headers:
+            if header_count == 3:
+                break
             else:
-                return False, [], 0
+                potential_facts_content.append(content[i])
+                header_count += headers
+        elif content[i].type not in ["header", "paragraph"]:
+            # print(f"Found block - moving to end {content[i]}")
+            blocks_to_move.append(content[i])
         else:
-            return False, [], 0
+            print(f"Adding {content[i].get_text()}")
+            potential_facts_content.append(content[i])
+        i += 1
 
-    if len(fact_data) != 3:
+    print(f"Potential facts content = {len(potential_facts_content)}")
+    # We now have i at the header following the paragraph.
+    # If potential_facts_content > 6 prompt user to make sure its okay
+    if len(potential_facts_content) > 6:
+        for block_i, b in enumerate(potential_facts_content):
+            print(f"{block_i}. {b.get_text()[0:50]}")
+
+        index = input("last block index?")
+
+        if index < len(potential_facts_content):
+            # These blocks need to come off and go at the beginning of blocks_to_move
+            blocks_to_move = potential_facts_content[index:] + blocks_to_move
+            potential_facts_content = potential_facts_content[:index]
+
+    all_text = [
+        b.get_text().upper() if b.type == "heading" else b.get_text()
+        for b in potential_facts_content
+    ]
+    # Combine all chunks into one text
+    combined_text = "\n".join(all_text)
+
+    print(combined_text)
+
+    # Updated regex: matches either start of string or \n followed by optional number and ALL CAPS header
+    pattern = re.compile(
+        r"(?:^|\n)"  # Start of string or newline
+        r"(?:\d+\.\s+)?"  # Optional number and dot
+        r'([A-Z0-9 .,"\-\'():%&]+)'  # Header with uppercase letters, numbers, punctuation
+        r"\n+"  # Newlines between header and body
+        r"(.*?)"  # Body text
+        r"(?=(?:\n(?:\d+\.\s+)?[A-Z0-9])|$)",  # Lookahead for next header or end
+        re.DOTALL,
+    )
+
+    matches = pattern.findall(combined_text)
+
+    result = []
+    for header, text in matches:
+        clean_header = header.strip()
+        clean_text = text.strip().replace("\n", " ")
+        result.append((clean_header, clean_text))
+
+    if len(result) != 3:
+        print(f"Unexpected results: {result=}")
+        raise "stop"
         return False, [], 0
 
-    # Create fact items from the 6 separate paragraphs
     fact_items = []
-    for j, (heading_text, body_text) in enumerate(fact_data):
+    for j, (header, text) in enumerate(result):
         fact_items.append(
             FactItemBlock(
                 attrs=FactItemBlock.Attrs(
@@ -98,14 +149,19 @@ def extract_separate_fact_paragraphs(
                 content=[
                     HeadingNode(
                         attrs=HeadingNode.Attrs(level=3),
-                        content=[TextNode(text=heading_text)],
+                        content=[TextNode(text=header)],
                     ),
-                    ParagraphNode(content=[TextNode(text=body_text)]),
+                    ParagraphNode(content=[TextNode(text=text)]),
                 ],
             )
         )
-
-    return True, fact_items, 6  # 6 paragraphs consumed TODO - this may be off by one
+    all_blocks = fact_items + blocks_to_move
+    print(f"{all_blocks=}")
+    return (
+        True,
+        all_blocks,
+        len(potential_facts_content) + len(blocks_to_move),
+    )
 
 
 def split_facts(text: str) -> List[str]:
@@ -243,16 +299,14 @@ def create_image_header(content: List[Block]) -> List[Block]:
         return content
 
     new_content = []
+    header_done = False
     i = 0
     while i < len(content):
-        if (
-            i + 2 < len(content)
-            and isinstance(content[i], ImageNode)
-            and isinstance(content[i + 1], ImageNode)
-        ):
+        if isinstance(content[i], ImageNode) and i < 10 and not header_done:
             image1 = content[i]
-            image2 = content[i + 1]
-            header_content = [image1, image2]
+            header_content = [image1]
+            if isinstance(content[i + 1], ImageNode):
+                header_content.append(content[i + 1])
             if isinstance(content[i + 2], ImageNode):
                 header_content.append(content[i + 2])
 
@@ -374,7 +428,6 @@ def extract_osa_table(blocks: List[Block]) -> List[Block]:
 
     while i < len(blocks):
         block = blocks[i]
-        print(f"Checking {block=}")
         if (
             block.type == "heading"
             and block.content[0].text.lower().replace(",", "")
