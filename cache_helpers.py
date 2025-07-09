@@ -5,7 +5,6 @@ Cache helper functions for pipeline operations.
 import hashlib
 import json
 import os
-from datetime import datetime
 from typing import Any, Optional
 
 from etl.pymupdf_parse import PyMuPDFOutput

@@ -1,6 +1,6 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
-from pydantic import validator, BaseModel
+from pydantic import BaseModel, validator
 from typing_extensions import Literal
 
 from schema.block import BaseAttrs, Block

@@ -169,17 +169,23 @@ def save_output(pdf_path):
 
     database.connect()
     try:
-        matches = re.match(r"^(\d+)(?:\s+\|)?\s+(.*)$", state.blocks[0].content[0].text)
+        first_node_text = state.blocks[0].get_text()
 
         def titlecase(s: str):
             return " ".join(x.capitalize() for x in s.split())
 
-        if matches:
-            title = matches.group(2)
-            label = f"Chapter {matches.group(1)}"
+        if first_node_text:
+            matches = re.match(r"^(\d+)(?:\s+\|)?\s+(.*)$", first_node_text)
+
+            if matches:
+                title = matches.group(2)
+                label = f"Chapter {matches.group(1)}"
+            else:
+                title = state.blocks[0].get_text()
+                label = ""
         else:
-            title = state.blocks[0].get_text()
-            label = ""
+            title = "Unknown"
+            label = "Chapter ?"
 
         title = titlecase(title.strip())
         slug = re.sub(r"\s", "-", title.lower())

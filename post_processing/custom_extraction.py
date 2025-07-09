@@ -15,7 +15,6 @@ from post_processing.williston_extraction_schema import (
 from schema.block import Block
 from schema.portable_schema import (
     ActionTableBlock,
-    CustomBlock,
     FactItemBlock,
     GoalItemBlock,
 )

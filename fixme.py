@@ -10,7 +10,6 @@ import sys
 from typing import Optional
 
 from dotenv import load_dotenv
-from peewee import fn
 from supabase import Client, create_client
 
 from export.models import Blocks, Collections, Documents, database
@@ -33,6 +32,7 @@ def find_document_by_chapter(chapter_number: int) -> Optional[Documents]:
     """
     try:
         database.connect()
+        print("Connected")
 
         # Look for documents with label like "Chapter {chapter_number}"
         chapter_label = f"Chapter {chapter_number}"

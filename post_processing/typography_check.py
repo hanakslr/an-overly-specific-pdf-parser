@@ -1,6 +1,6 @@
 import json
-from collections import defaultdict
 import re
+from collections import defaultdict
 
 from etl.pymupdf_parse import TextItem
 from schema.tiptap_models import CitationNode, HeadingNode, ParagraphNode, TextNode

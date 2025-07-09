@@ -1,8 +1,8 @@
 import argparse
 import sys
 
-from fixme import find_document_by_chapter
 from export.models import Blocks, database
+from fixme import find_document_by_chapter
 
 CHAPTER_NUMBER = 6
 NEW_ORDER = [14, 13, 15, 16, 18, 19, 17, 21, 20, 22, 23, 24, 25, 27, 26]
