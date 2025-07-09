@@ -19,6 +19,14 @@ dependencies = [
     "pymupdf>=1.26.1",
     "supabase>=2.16.0",
     "uvicorn>=0.34.3",
+    "accelerate==0.21.0", # Still compatible with transformers 4.30.2
+    "numpy<2.0",
+    "sentence-transformers==2.2.2",
+    "torch==2.0.1",
+    "transformers==4.30.2",
+    "llama-index>=0.12.40",
+    "qdrant-client>=1.12.1",
+    "llama-index-vector-stores-qdrant>=0.6.0",
 ]
 
 [dependency-groups]
@@ -35,3 +43,13 @@ quote-style = "double"
 # Use spaces around operators
 line-ending = "auto"
 indent-style = "space"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu" },
+]
