@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Optional
 
@@ -11,13 +12,109 @@ from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.qdrant.base import QdrantVectorStore
 from qdrant_client import models
+import spacy
 
 from export.models import Blocks, Documents
 from fixme import find_document_by_chapter, list_blocks
 
 load_dotenv()
 
-COLLECTION_NAME = "williston_town_plan"
+COLLECTION_NAME = "williston_town_plan_V2"
+
+nlp = spacy.load("en_core_web_sm")
+
+
+def extract_entities(text):
+    print("\n\n")
+    print(text)
+    doc = nlp(text)
+
+    # ORG, GPE, PERSON, NORP
+    for ent in doc.ents:
+        print(ent.text, ent.label_)
+
+    noun_chunks = []
+    for chunk in doc.noun_chunks:
+        # The root token’s dependency label
+        dep = chunk.root.dep_
+        # The root token’s head word
+        head = chunk.root.head.text
+
+        noun_chunks.append((chunk.text, dep, head))
+
+    print("All noun chunks + deps:")
+    for nc in noun_chunks:
+        print(nc)
+
+    important_deps = {"nsubj", "nsubjpass", "dobj", "pobj", "attr"}
+
+    filler_words = [
+        "it",
+        "and",
+        "the",
+        "at",
+        "which",
+        "a",
+        "as",
+        "an",
+        "any",
+        "much",
+        "way",
+        "who",
+        "day",
+        "more",
+        "its",
+        "all",
+        "part",
+        "many",
+        "people",
+        "that",
+        "more",
+        "town",
+        "some",
+        "now",
+        "they",
+        "their",
+        "this",
+        "williston",
+        "williston's",
+        "plan",
+        "our",
+        "you",
+        "those",
+        "few",
+        "these",
+        "everyone",
+        "most",
+        "residents",
+        "those",
+        "community",
+        "members",
+        "conclusion",
+    ]
+
+    def remove_fillers(t):
+        if re.search(r"\d+", t):
+            return ""
+        words = t.split()
+        words = [w.strip() for w in words if w.strip() and w not in filler_words]
+
+        if len(words) >= 4:
+            return ""
+
+        return " ".join(words)
+
+    salient_chunks = [
+        remove_fillers(chunk.text.lower())
+        for chunk in doc.noun_chunks
+        if chunk.root.dep_ in important_deps
+    ]
+
+    salient_chunks = set([s for s in salient_chunks if s])
+
+    print("Salient:", salient_chunks)
+
+    return list(salient_chunks)
 
 
 def index_block(
@@ -46,6 +143,7 @@ def index_block(
         "chapter_number": chapter_number,
         "chapter_title": chapter_title,
         "document_index": block.document_index,
+        "section_path": section_path,
     }
 
     documents = []
@@ -62,9 +160,11 @@ def index_block(
             for p in individual_paragraphs:
                 if not p.strip():
                     continue
-                text = p if not section_path else f"Section: {section_path}.\n{p}"
+                text = p
+                entities = extract_entities(text)
                 doc_metadata = base_metadata.copy()
                 doc_metadata["text_type"] = "paragraph"
+                doc_metadata["entities"] = entities
                 documents.append(Document(text=text, metadata=doc_metadata))
 
     elif block.type in [
@@ -91,6 +191,7 @@ def index_block(
                 objective_text = (
                     f"Objective {obj.get('label', '')}: {obj.get('text', '')}"
                 )
+                obj_metadata["entities"] = extract_entities(obj.get("text", ""))
                 documents.append(Document(text=objective_text, metadata=obj_metadata))
 
             # Create documents for strategies and their actions
@@ -105,6 +206,7 @@ def index_block(
                 strat_metadata["strategy_label"] = strategy_label
 
                 strategy_doc_text = f"Strategy {strategy_label}: {strategy_text}"
+                strat_metadata["entities"] = extract_entities(strategy_text)
                 documents.append(
                     Document(text=strategy_doc_text, metadata=strat_metadata)
                 )
@@ -117,13 +219,13 @@ def index_block(
                     action_metadata["strategy_label"] = strategy_label
                     action_metadata["action_label"] = action.get("label", "")
 
+                    action_metadata["entities"] = extract_entities(
+                        action.get("text", "")
+                    )
+
                     # Include strategy text in action document as specified
                     action_text = (
-                        f"Strategy {strategy_label}: {strategy_text}\n\n"
                         f"Action {action.get('label', '')}: {action.get('text', '')}\n"
-                        f"Responsibility: {action.get('responsibility', '')}\n"
-                        f"Timeframe: {action.get('timeframe', '')}\n"
-                        f"Cost: {action.get('cost', '')}"
                     )
                     documents.append(
                         Document(text=action_text, metadata=action_metadata)
@@ -136,6 +238,7 @@ def index_block(
             text = f"Goal: {block.attrs.get('trait', '')} in 2050 {text}"
             goal_metadata = base_metadata.copy()
             goal_metadata["text_type"] = "goal_item"
+            goal_metadata["entities"] = extract_entities(text)
             if block.attrs:
                 goal_metadata["trait"] = block.attrs.get("trait", "")
             documents.append(Document(text=text, metadata=goal_metadata))
@@ -146,6 +249,7 @@ def index_block(
         if text.strip():
             fact_metadata = base_metadata.copy()
             fact_metadata["text_type"] = "fact_item"
+            fact_metadata["entities"] = extract_entities(text)
             if block.attrs:
                 fact_metadata["label"] = block.attrs.get("label", "")
             documents.append(Document(text=text, metadata=fact_metadata))
@@ -184,10 +288,10 @@ def index_blocks(
         print(f"Got {len(d)} docs for {block.type}")
         qdrant_docs.extend(d)
 
-    for d in qdrant_docs:
-        print(d.text)
-        print(d.metadata)
-        print("\n\n")
+    # for d in qdrant_docs:
+    #     print(d.text)
+    #     print(d.metadata)
+    #     print("\n\n")
     return qdrant_docs
 
 
@@ -212,7 +316,6 @@ def main():
         sys.exit(1)
 
     qdrant_documents = index_blocks(chapter_number, document, blocks)
-
     client = qdrant_client.QdrantClient(
         url=os.getenv("QDRANT_URL"),
         api_key=os.getenv("QDRANT_CLOUD_API_KEY"),
@@ -257,7 +360,7 @@ def main():
     )
 
     # Provide an example query using the index
-    example_query = f"What are the main objectives in Chapter {chapter_number}?"
+    example_query = "What does the plan have to say about a dog park?"
     retriever = index.as_retriever(similarity_top_k=3)
     nodes = retriever.retrieve(example_query)
 

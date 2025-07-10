@@ -27,6 +27,8 @@ dependencies = [
     "llama-index>=0.12.40",
     "qdrant-client>=1.12.1",
     "llama-index-vector-stores-qdrant>=0.6.0",
+    "spacy>=3.8.7",
+    "pip>=25.1.1",
 ]
 
 [dependency-groups]

@@ -41,7 +41,7 @@ def find_document_by_chapter(chapter_number: int) -> Optional[Documents]:
             Documents.select()
             .join(Collections)
             .where(
-                (Documents.label == chapter_label)
+                (Documents.collection_index == chapter_number)
                 & (Collections.name == COLLECTION_NAME)
             )
             .first()
