@@ -12,6 +12,8 @@ Iterated into something fairly specific for one visually complex PDF with a lot 
 
 2. ProseMirror is a great format for a live editor (of which I chose the Tiptap editor thats built on it for a nicer interface) - but complicated for normal, non-editor rendering. Initially, I thought I might store directly in ProseMirror JSON, extending the schema as needed, and then implementing the render methods in that schema to display in a non-editable view. But this added a ton of unneeded complexity. I settled on an intermediary format that is prosemirror flavored. I can convert it to prosemirror and back for an editable view, but create my own view-only components with less restrictions. Editing was moved to out of scope.
 
+The output of this is consumed by [town-plan-website](https://github.com/hanakslr/town-plan-website) and deployed at https://willistonvtdraft.townplan.us
+
 That said, this setup was really cool, because `doc_server` is a FastAPI server that serves up a ProseMirror document, and inside `tiptap` is a minimal tiptap (prose mirror) editor that read from the server. This meant that while I was using the ProseMirror schema as my storage format, I could see the document convert in real time, which gives an oppurtunuity to loop in feedback to the generation (if it looks right or not). I eventually killed the live viewer when I changed schemas, but I think its useful to explore in the future - especially, how the output could be used to automatically inform and potentially correct LLM suggestions of how a certain block should render.
 
 This whole process is orchestrated by LangGraph.
