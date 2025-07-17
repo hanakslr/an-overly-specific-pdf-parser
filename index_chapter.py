@@ -225,7 +225,7 @@ def index_block(
 
                     # Include strategy text in action document as specified
                     action_text = (
-                        f"Action {action.get('label', '')}: {action.get('text', '')}\n"
+                        f"{action.get('text', '')} (Action {action.get('label', '')})"
                     )
                     documents.append(
                         Document(text=action_text, metadata=action_metadata)

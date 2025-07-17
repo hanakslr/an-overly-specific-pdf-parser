@@ -2,7 +2,7 @@ from typing import Literal, Tuple, Union
 
 from pydantic import BaseModel
 
-from post_processing.williston_extraction_schema import ActionTable
+from post_processing.williston_extraction_schema import ActionTable, StrategyItem
 from schema.block import Block
 from schema.tiptap_models import (
     BlockquoteNode,
@@ -49,7 +49,27 @@ class ActionTableBlock(Block):
         """
         Just return objectives for now. TODO: update this.
         """
-        return "\n".join([f"{o.label}. {o.text}" for o in self.content.objectives])
+
+        def actions(strategy: StrategyItem):
+            return "\n".join([f"{a.label}: {a.text}" for a in strategy.actions])
+
+        objectives_text = "\n".join(
+            [f"{o.label}. {o.text}" for o in self.content.objectives]
+        )
+        strategies = [
+            f"""
+            {s.label}: {s.text}
+            Actions: {actions(s)}
+        """
+            for s in self.content.strategies
+        ]
+        return f"""
+Objectives: 
+{objectives_text}
+
+Strategies and Actions:
+{strategies}
+        """
 
 
 class CustomBlock(Block):

@@ -36,6 +36,10 @@ class ParagraphNode(Block):
 
     attrs: Attrs = Attrs()
 
+    def get_text(self):
+        # We don't want to include citations here.
+        return " ".join([n.get_text() for n in self.content if n.type == "text"])
+
 
 class BlockquoteNode(Block):
     type: Literal["blockquote"] = "blockquote"
